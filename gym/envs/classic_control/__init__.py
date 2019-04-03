@@ -15,3 +15,5 @@ from gym.envs.classic_control.simpler_path_finding import SimplerPathFinding
 from gym.envs.classic_control.simpler_path_finding_data_collect import SimplerPathFindingDataCollect
 from gym.envs.classic_control.path_finding_deceptive import PathFindingDeceptive
 from gym.envs.classic_control.point_mass_wandering import PointMassWanderingEnv
+from gym.envs.classic_control.simple_particle_carving import SimplerParticleCarving
+from gym.envs.classic_control.simple_particle_carving_rotation import SimplerParticleCarvingRotation

@@ -92,9 +92,9 @@ class Continuous_MountainCarEnv(gym.Env):
 
         reward -= math.pow(action[0], 2) * 0.1
 
-        return self.state, (reward, -novelPenn), done, {'rwd': reward, 'NoveltyPenn': -novelPenn,
-                                                        'NoveltyRwd': novelRwd,
-                                                        'tau': action}
+        return self.state, reward, done, {'rwd': reward, 'NoveltyPenn': -novelPenn,
+                                          'NoveltyRwd': novelRwd,
+                                          'tau': action}
 
     def _reset(self):
         self.stepNum = 0

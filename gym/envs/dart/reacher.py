@@ -87,11 +87,13 @@ class DartReacherEnv(dart_env.DartEnv, utils.EzPickle):
         # 4. Try 200
         reward -= 200 * novelPenn
         # self.trail.append(self.robot_skeleton.bodynodes[2].to_world(fingertip))
-
-        return ob, (reward, -novelPenn), done, {'rwd': reward,
-                                                'states': s, 'actions': tau,
-                                                'NoveltyRwd': novelRwd, 'NoveltyPenn': -novelPenn
-                                                }
+        # print("asf")
+        comb_ret = (reward, -novelPenn)
+        # print(comb_ret)
+        return ob, comb_ret, done, {'rwd': reward,
+                                    'states': s, 'actions': tau,
+                                    'NoveltyRwd': novelRwd, 'NoveltyPenn': -novelPenn
+                                    }
 
     def _get_obs(self):
         theta = self.robot_skeleton.q

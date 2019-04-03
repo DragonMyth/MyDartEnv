@@ -108,6 +108,8 @@ class PathFindingDeceptive(gym.Env):
         self.ret = 0
         self.normScale = self.generateNormScaleArr([4, 10])
 
+        # self.trail_color = [1,1,0]
+
     def generateNormScaleArr(self, norm_scales):
         norms = np.zeros(len(self._get_obs()[self.ignore_obs::]))
 
@@ -380,11 +382,11 @@ class PathFindingDeceptive(gym.Env):
             path_segment = rendering.Line(start=(point_1_x, point_1_y), end=(point_2_x, point_2_y))
             path_segment.attrs[-1] = rendering.LineWidth(10)
             # print(avg_color)
-            if (avg_color < 0):
-
-                path_segment.set_color(self.trail_color[0], self.trail_color[1], self.trail_color[2])
-            else:
-                path_segment.set_color(0, min(1, avg_color * 0.8), 0)
+            # if (avg_color < 0):
+            #
+            #     path_segment.set_color(self.trail_color[0], self.trail_color[1], self.trail_color[2])
+            # else:
+            #     path_segment.set_color(0, min(1, avg_color * 0.8), 0)
 
             self.viewer.add_geom(path_segment)
 

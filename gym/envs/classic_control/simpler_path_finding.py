@@ -220,12 +220,13 @@ class SimplerPathFinding(gym.Env):
         # self.have_goal_rew = False
         self.ret += reward
 
-        #1. 200
-        #2. 500
-        #3. 1000
-        #4. 100
-        reward -= 100 * novelPenn
-        return obs, (reward, -novelPenn), done, {'Alive penalty': alive_penalty,
+        # 1. 200
+        # 2. 500
+        # 3. 1000
+        # 4. 100
+        # reward -= 100 * novelPenn
+
+        return obs, reward, done, {'Alive penalty': alive_penalty,
                                                  'tau': tau, 'Novelty': novelRwd,
                                                  'Total Reward': reward}
 
