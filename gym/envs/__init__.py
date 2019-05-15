@@ -139,6 +139,12 @@ register(
 
 )
 
+register(
+    id='SimplerParticleCarving-v2',
+    entry_point='gym.envs.classic_control:SimplerParticleCarvingCircleMatch',
+    max_episode_steps=1000,
+)
+
 # PathFindingDeceptive
 register(
     id='PathFindingDeceptive-v0',

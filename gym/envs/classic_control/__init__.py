@@ -17,3 +17,4 @@ from gym.envs.classic_control.path_finding_deceptive import PathFindingDeceptive
 from gym.envs.classic_control.point_mass_wandering import PointMassWanderingEnv
 from gym.envs.classic_control.simple_particle_carving import SimplerParticleCarving
 from gym.envs.classic_control.simple_particle_carving_rotation import SimplerParticleCarvingRotation
+from gym.envs.classic_control.simple_particle_carving_circle_match import SimplerParticleCarvingCircleMatch

@@ -227,8 +227,8 @@ class SimplerPathFinding(gym.Env):
         # reward -= 100 * novelPenn
 
         return obs, reward, done, {'Alive penalty': alive_penalty,
-                                                 'tau': tau, 'Novelty': novelRwd,
-                                                 'Total Reward': reward}
+                                   'tau': tau, 'Novelty': novelRwd,
+                                   'Total Reward': reward}
 
     def _get_obs(self):
         return np.concatenate([[self.point_pos[0], self.point_pos[1]], [self.point_vel[0], self.point_vel[1]]]).ravel()

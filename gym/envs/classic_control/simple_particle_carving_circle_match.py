@@ -16,7 +16,7 @@ from .ParticlesSim import ParticlesSim
 logger = logging.getLogger(__name__)
 
 
-class SimplerParticleCarvingRotation(gym.Env):
+class SimplerParticleCarvingCircleMatch(gym.Env):
     def __init__(self):
 
         # 0 for path
@@ -30,40 +30,42 @@ class SimplerParticleCarvingRotation(gym.Env):
         self.cellSize = self.world_size * 1.0 / self.numCells
         self.numParts = 500
         self.particleSim = ParticlesSim(self.numParts, self.dt)
-
         self.density_map = np.zeros((self.numCells, self.numCells), dtype=int)
+        self.prev_density_map = np.zeros_like(self.density_map)
+
         self.grid_world = [[[] for _ in range(len(self.density_map[0]))] for _ in range(len(self.density_map))]
-        self.template = self.generate_template()
+
         self.geomCnt = 0
         self.frameskip = 5
-        # self.obs_dim = self.numCells ** 2
-        self.obs_dim = self.numCells * self.numCells + 8
-
+        self.obs_dim = self.numCells * self.numCells * 2 + 15
         self.act_dim = 4
-        # self.repelling_force_scale = 1
-        self.action_high = np.ones(self.act_dim) * self.world_size_view / 2
-        # self.action_high[2:4] = 1
-        self.action_low = - self.action_high
-        self.action_space = spaces.Box(self.action_low, self.action_high)
 
+        self.action_high = np.ones(self.act_dim) * self.world_size_view / 2 * 1.2
+        # self.action_high[2] = np.pi
+        self.action_low = - self.action_high
+
+        self.action_space = spaces.Box(self.action_low, self.action_high)
         self.pos_high = np.ones(3) * self.world_size_view / 2
-        self.pos_high[2] = 2 * np.pi
+        self.pos_high[2] = np.pi
         self.pos_low = - self.pos_high
-        self.pos_low[2] = 0
+        # self.pos_low[2] = 0
         obs_high = np.ones(self.obs_dim) * self.world_size_view / 2
         obs_low = -obs_high
         self.observation_space = spaces.Box(obs_low, obs_high)
-        self.t = 0
 
-        self.curr_act = None
+        self.circle_info = np.array([0, 0, 0.3])
+        self.template = self.generate_template()
+
         self.action_scale = 1
-        self.curr_iter = 1000
         self.half_length = 0.3
         self.curr_pos = np.array([1.0, 0.0, 0.0])
         self.curr_vel = np.array([0.0, 0.0, 0.0])
-
-        self.kp = np.array([10, 10, 20])
-        self.kd = np.array([4, 4, 5])
+        # self.curr_act = np.array(
+        #     [self.curr_pos[0], self.curr_pos[1], self.curr_pos[2]])
+        self.curr_act = np.array(
+            [self.curr_pos[0], self.curr_pos[1], np.cos(self.curr_pos[2]), np.sin(self.curr_pos[2])])
+        self.kp = np.array([20, 20, 40])
+        self.kd = np.array([8, 8, 6])
 
         self.viewer = None
         self.metadata = {
@@ -79,38 +81,59 @@ class SimplerParticleCarvingRotation(gym.Env):
         # print(action)
 
         action = np.clip(action * self.action_scale, self.action_low, self.action_high)
+        action[2::] = action[2::] / np.linalg.norm(action[2::])
         self.curr_act = action
+
         oldPos = self.particleSim.positions.copy()
+
+        old_mean_dist = np.sum(
+            np.clip(np.linalg.norm(oldPos - self.circle_info[0:2], axis=1) - self.circle_info[2], 0, 2))
+
         self.do_simulation(action, self.frameskip)
-        # print(self.curr_pos)
+
+        curr_mean_dist = np.sum(
+            np.clip(np.linalg.norm(self.particleSim.positions - self.circle_info[0:2], axis=1) - self.circle_info[2], 0,
+                    2))
+
         done = False
         obs = self._get_obs()
 
-        dist_rwd_positive = 0
+        # dist_rwd_positive = 0
 
-        reward = np.sum(abs(oldPos)) - np.sum(np.abs(self.particleSim.positions))
-        # print(reward)
-        if abs(reward) > 1000 or np.isnan(reward):
-            print("Invalid REWARD!!!!!!!!!!")
-        return obs, reward, done, {'rwd': reward, 'dist_rwd_positive': dist_rwd_positive,
+        reward = (old_mean_dist - curr_mean_dist)  # - 0.01 * outlier
+
+        return obs, reward, done, {'rwd': reward, 'progressRwd': old_mean_dist - curr_mean_dist
                                    }
 
     def generate_template(self):
         template = np.zeros_like(self.density_map)
 
-        # for i in range(len(template)):
-        #     for j in range(len(template)):
-        #         pos = self.grid_idx_to_pos(i, j)
-        #         if (pos[0] < 0):
-        #             template[i][j] = 1
+        for i in range(len(template)):
+            for j in range(len(template)):
+                pos = self.grid_idx_to_pos(i, j)
+                if (np.linalg.norm(pos - self.circle_info[0:2]) <= self.circle_info[2]):
+                    template[i][j] = 1
+
         return template
 
     def _get_obs(self):
 
+        bar_pos = np.concatenate([self.curr_pos[0:2], [np.cos(self.curr_pos[2]), np.sin(self.curr_pos[2])]])
+        bar_vel = np.concatenate([self.curr_vel[0:2],
+                                  [np.cos(self.curr_vel[2]), np.sin(self.curr_vel[2])]])
+
+        bar_info = np.concatenate([bar_pos, bar_vel, self.curr_act])
+
+        circle_info = self.circle_info
+
+        particle_info = np.concatenate(
+            [self.density_map.flatten() / 5.0 - self.template.flatten(),
+             self.prev_density_map.flatten() / 5.0 - self.template.flatten()])
+
+        # Dimension: 4 x 3 + 3 + n x n x 2
         obs = np.concatenate(
-            [self.curr_pos[0:2], [np.sin(self.curr_pos[2]), np.cos(self.curr_pos[2])], self.curr_vel[0:2],
-             [np.sin(self.curr_vel[2]), np.cos(self.curr_vel[2])],
-             self.density_map.flatten() / 5]).ravel()
+            [bar_info, circle_info, particle_info]).ravel()
+
         return obs
 
     def first_nonzero(self, arr, axis, invalid_val=-1):
@@ -124,19 +147,26 @@ class SimplerParticleCarvingRotation(gym.Env):
             normalize_targ_vec = np.array([np.cos(self.curr_pos[2]), np.sin(self.curr_pos[2])])
 
         target_ang = np.angle(normalize_targ_vec[0] + normalize_targ_vec[1] * 1j)
-        if (target_ang < 0):
-            target_ang += 2 * np.pi
 
         targ_pos = np.zeros(3)
         targ_pos[0:2] = act[0:2]
         targ_pos[2] = target_ang
+
         tau = self.kp * (targ_pos - self.curr_pos) - self.kd * self.curr_vel
         # print(act)
-        r1 = targ_pos[2] - self.curr_pos[2]
-        r2 = targ_pos[2] + 2 * np.pi - self.curr_pos[2]
-        r3 = targ_pos[2] - 2 * np.pi - self.curr_pos[2]
-        rl = [r1, r2, r3]
-        r = rl[np.argmin(np.array([abs(r1), abs(r2), abs(r3)]))]
+        r = targ_pos[2] - self.curr_pos[2]
+
+        # r2 = targ_pos[2] + 2 * np.pi - self.curr_pos[2]
+        # r3 = targ_pos[2] - 2 * np.pi - self.curr_pos[2]
+        #
+        # rl = [r1, r2, r3]
+        #
+        # r = rl[np.argmin(np.array([abs(r1), abs(r2), abs(r3)]))]
+
+        if r > np.pi:
+            r -= np.pi * 2
+        if r < -np.pi:
+            r += np.pi * 2
 
         tau[2] = self.kp[2] * (r) - self.kd[2] * self.curr_vel[2]
 
@@ -144,10 +174,10 @@ class SimplerParticleCarvingRotation(gym.Env):
         # print(r)
         self.curr_pos = self.curr_pos + self.curr_vel * self.dt
 
-        if (self.curr_pos[2] < 0):
-            self.curr_pos[2] += np.pi * 2
-        elif (self.curr_pos[2] > np.pi * 2):
+        if (self.curr_pos[2] > np.pi):
             self.curr_pos[2] -= np.pi * 2
+        elif (self.curr_pos[2] < -np.pi):
+            self.curr_pos[2] += np.pi * 2
 
         self.curr_pos = np.clip(self.curr_pos, self.pos_low, self.pos_high)
         x_0 = np.array([(self.curr_pos[0]) + self.half_length * np.cos(self.curr_pos[2]),
@@ -157,27 +187,35 @@ class SimplerParticleCarvingRotation(gym.Env):
                         self.curr_pos[1] - self.half_length * np.sin(self.curr_pos[2])])
 
         norm_dir = np.array([x_1[1] - x_0[1], -(x_1[0] - x_0[0])])
+
         if (np.linalg.norm(norm_dir) > 0.0005):
             norm_dir = norm_dir / np.linalg.norm(norm_dir)
 
+        self.prev_density_map = self.particleSim.fillDensityMap(self.world_size, self.numCells)
+
         for fs in range(frameskip):
             self.particleSim.advance(x_0, x_1, norm_dir)
+
         self.density_map = self.particleSim.fillDensityMap(self.world_size, self.numCells)
 
     def _reset(self):
-        self.curr_act = None
+
         self.grid_world = [[[] for _ in range(len(self.density_map[0]))] for _ in range(len(self.density_map))]
 
-        rand_angle = np.random.uniform(-np.pi / 3, np.pi / 3, 1)
-        if (rand_angle < 0):
-            rand_angle += 2 * np.pi
+        rand_angle = np.random.uniform(np.pi / 2 - np.pi / 3, np.pi / 2 + np.pi / 3, 1)
+
         rand_pos = np.concatenate([np.random.uniform(-0.25, 0.25, 2), rand_angle])
 
         self.curr_pos = np.array([1, 0, 0]) + rand_pos
         self.curr_vel = np.array([0, 0, 0]) + np.random.uniform(-0.1, 0.1, 3)
+        self.curr_act = np.array(
+            [self.curr_pos[0], self.curr_pos[1], np.cos(self.curr_pos[2]), np.sin(self.curr_pos[2])])
 
         self.particleSim.randomInit(self.world_size)
         self.density_map = self.particleSim.fillDensityMap(self.world_size, self.numCells)
+
+        self.circle_info = np.array([0, 0, 0.3]) + np.concatenate([np.random.uniform(-0.7, 0.7, 2), [0]])
+        self.template = self.generate_template()
 
         return self._get_obs()
 
@@ -216,21 +254,21 @@ class SimplerParticleCarvingRotation(gym.Env):
                 self.viewer.add_geom(vertLine)
                 self.geomCnt += 1
 
-            # for i in range(len(self.template)):
-            #     for j in range(len(self.template[0])):
-            #         posX, posY = self.grid_idx_to_pos(i, j)
-            #         screenX, screenY = self.world_to_screen([posX, posY], screen_width, screen_height)
-            #         fill = rendering.make_circle(
-            #             radius=(screen_width * self.world_size / self.world_size_view) / (
-            #                     2.0 * len(self.template)) - 1)
-            #         trans = rendering.Transform((screenX, screenY))
-            #         fill.add_attr(trans)
-            #         normalized_template = self.template[i][j] / np.max(self.template)
-            #         color = (1 - normalized_template, 1, 1 - normalized_template)
-            #         fill.set_color(color[0], color[1], color[2])
-            #         # if (color[0] != 1):
-            #         self.viewer.add_geom(fill)
-            #         self.geomCnt += 1
+            for i in range(len(self.template)):
+                for j in range(len(self.template[0])):
+                    posX, posY = self.grid_idx_to_pos(i, j)
+                    screenX, screenY = self.world_to_screen([posX, posY], screen_width, screen_height)
+                    fill = rendering.make_circle(
+                        radius=(screen_width * self.world_size / self.world_size_view) / (
+                                2.0 * len(self.template)) - 1)
+                    trans = rendering.Transform((screenX, screenY))
+                    fill.add_attr(trans)
+                    normalized_template = self.template[i][j] / np.max(self.template)
+                    color = (1 - normalized_template, 1, 1 - normalized_template)
+                    fill.set_color(color[0], color[1], color[2])
+                    # if (color[0] != 1):
+                    self.viewer.add_geom(fill)
+                    self.geomCnt += 1
 
         geoms = self.viewer.geoms[:self.geomCnt]
         # geoms = []
@@ -255,11 +293,10 @@ class SimplerParticleCarvingRotation(gym.Env):
             else:
                 normalize_targ_vec = np.array([np.cos(self.curr_pos[2]), np.sin(self.curr_pos[2])])
             target_ang = np.angle(normalize_targ_vec[0] + normalize_targ_vec[1] * 1j)
-            if (target_ang < 0):
-                target_ang += 2 * np.pi
 
             targ_pos = np.zeros(3)
             targ_pos[0:2] = self.curr_act[0:2]
+            # targ_pos[2] = self.curr_act[2]
             targ_pos[2] = target_ang
             # x_1 = np.array([self.curr_act[0], self.curr_act[1] + self.half_length])
             # x_2 = np.array([self.curr_act[0], self.curr_act[1] - self.half_length])

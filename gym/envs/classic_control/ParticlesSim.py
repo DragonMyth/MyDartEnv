@@ -27,9 +27,9 @@ class ParticlesSim():
         self.velocities = np.zeros((numPart, 2), dtype=np.float32)
         self.accumForce = np.zeros((numPart, 2), dtype=np.float32)
         self.mass = np.ones((numPart, 1), dtype=np.float32)
-        self.maxVelocities = 0.3  # * np.ones((numPart, 2), dtype=np.float32)
+        self.maxVelocities = 0.5  # * np.ones((numPart, 2), dtype=np.float32)
         self.dt = dt
-        self.repelling_force_scale = 3
+        self.repelling_force_scale = 7
         self.force_distance = 0.3
 
     def applyDragForce(self, ):
