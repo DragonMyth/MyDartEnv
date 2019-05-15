@@ -125,6 +125,26 @@ register(
 
 )
 
+register(
+    id='SimplerParticleCarving-v0',
+    entry_point='gym.envs.classic_control:SimplerParticleCarving',
+    max_episode_steps=1000,
+
+)
+
+register(
+    id='SimplerParticleCarving-v1',
+    entry_point='gym.envs.classic_control:SimplerParticleCarvingRotation',
+    max_episode_steps=1000,
+
+)
+
+register(
+    id='SimplerParticleCarving-v2',
+    entry_point='gym.envs.classic_control:SimplerParticleCarvingCircleMatch',
+    max_episode_steps=1000,
+)
+
 # PathFindingDeceptive
 register(
     id='PathFindingDeceptive-v0',
@@ -245,9 +265,6 @@ register(
     entry_point='gym.envs.toy_text.hotter_colder:HotterColder',
     max_episode_steps=200,
 )
-
-
-
 
 # Dart
 # ----------------------------------------
