@@ -578,6 +578,13 @@ register(
     max_episode_steps=1000,
 )
 
+#FLEX
+register(
+    id='FlexGranularSweep-v0',
+    entry_point='gym.envs.flex:GranularSweepEnv',
+    max_episode_steps=1000,
+)
+
 # Atari
 # ----------------------------------------
 

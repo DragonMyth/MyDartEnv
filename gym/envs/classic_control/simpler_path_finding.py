@@ -224,8 +224,8 @@ class SimplerPathFinding(gym.Env):
         #2. 500
         #3. 1000
         #4. 100
-        reward -= 100 * novelPenn
-        return obs, (reward, -novelPenn), done, {'Alive penalty': alive_penalty,
+        # reward -= 100 * novelPenn
+        return obs, reward, done, {'Alive penalty': alive_penalty,
                                                  'tau': tau, 'Novelty': novelRwd,
                                                  'Total Reward': reward}
 

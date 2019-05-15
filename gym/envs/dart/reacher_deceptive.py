@@ -89,9 +89,9 @@ class DartReacherDeceptiveEnv(dart_env.DartEnv, utils.EzPickle):
         #1. 500
         #2. 1000
         #3. 200
-        reward -= 200 * novelPenn
+        # reward -= 200 * novelPenn
 
-        return ob, (reward, -novelPenn), done, {'rwd': reward,
+        return ob,reward, done, {'rwd': reward,
                                                 'states': s, 'actions': tau,
                                                 'NoveltyRwd': novelRwd, 'NoveltyPenn': -novelPenn
                                                 }

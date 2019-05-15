@@ -185,8 +185,8 @@ class PathFindingDeceptive(gym.Env):
         #2. 100
         #3. 1000
         #4. 200
-        reward -= 200 * novelPenn
-        return obs, (reward, -novelPenn), done, {'Alive penalty': alive_penalty,
+        # reward -= 200 * novelPenn
+        return obs, reward, done, {'Alive penalty': alive_penalty,
                                                  'tau': tau, 'Novelty': novelRwd,
                                                  'rwd': reward}
 
