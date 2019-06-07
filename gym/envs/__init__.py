@@ -602,6 +602,12 @@ register(
     max_episode_steps=1000,
 )
 
+register(
+    id='FlexGooSweep-v0',
+    entry_point='gym.envs.flex:GooSweepEnv',
+    max_episode_steps=1000,
+)
+
 # Atari
 # ----------------------------------------
 

@@ -3,7 +3,6 @@ Classic cart-pole system implemented by Rich Sutton et al.
 Copied from http://incompleteideas.net/sutton/book/code/pole.c
 permalink: https://perma.cc/C9ZM-652R
 """
-from numba import jit
 import logging
 import math
 import gym
@@ -68,8 +67,6 @@ class SimplerParticleCarving(gym.Env):
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
-
-    @jit
     def _step(self, action):
         # self.t += self.dt
         # print(self.t)
@@ -106,7 +103,6 @@ class SimplerParticleCarving(gym.Env):
         mask = arr != 0
         return np.where(mask.any(axis=axis), mask.argmax(axis=axis), invalid_val)
 
-    @jit
     def do_simulation(self, act, frameskip):
         tau = self.kp * (act - self.curr_pos) - self.kd * self.curr_vel
 

@@ -1,25 +1,5 @@
 import numpy as np
 
-from numba import jit
-from numba import njit
-from numba import jitclass
-from numba import int32, float32
-
-spec = [
-    ('numParticles', int32),  # a simple scalar field
-    ('positions', float32[:, :]),  # an array field
-    ('velocities', float32[:, :]),  # an array field
-    ('accumForce', float32[:, :]),  # an array field
-    ('mass', float32[:, :]),  # an array field
-    ('maxVelocities', float32),  # an array field
-    ('dt', float32),  # an array field
-    ('repelling_force_scale', float32),  # an array field
-    ('force_distance', float32),  # an array field
-
-]
-
-
-# @jitclass(spec)
 class ParticlesSim():
     def __init__(self, numPart, dt):
         self.numParticles = numPart
@@ -72,7 +52,6 @@ class ParticlesSim():
 
         self.accumForce += selector * normDirs * self.repelling_force_scale
 
-    # @njit
     def advance(self, p0, p1, normDir):
         self.applyDragForce()
         self.applyPushForce(p0, p1, normDir)
@@ -94,6 +73,5 @@ class ParticlesSim():
 
         H, xedges, yedges = np.histogram2d(y_pos, x_pos, bins=[numCells, numCells],
                                            range=[[-worldSize / 2, worldSize / 2], [-worldSize / 2, worldSize / 2]])
-        H = np.flip(H, axis=0)
         H = np.clip(H, 0, 5)
         return np.flip(H, axis=0)

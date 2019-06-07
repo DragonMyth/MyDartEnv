@@ -3,3 +3,4 @@ from gym.envs.flex.flex_env import FlexEnv
 # message if pydart is not installed correctly
 
 from gym.envs.flex.granular_sweep_env import GranularSweepEnv
+from gym.envs.flex.goo_sweep_env import GooSweepEnv

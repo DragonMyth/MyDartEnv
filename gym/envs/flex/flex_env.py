@@ -14,12 +14,13 @@ except ImportError as e:
 
 
 class FlexEnv(gym.Env):
-    def __init__(self, frame_skip, observation_size, action_bounds,
+    def __init__(self, frame_skip, observation_size, observation_bounds,action_bounds,
                  dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0):
         assert obs_type in ('parameter', 'image')
         assert action_type in ("continuous", "discrete")
         pyFlex.chooseScene(scene)
         pyFlex.initialize()
+
         pyFlex.setDt(dt)
         self.dt = dt
         print('pyFlex initialization OK')
@@ -29,29 +30,11 @@ class FlexEnv(gym.Env):
         self.numInstances = pyFlex.getNumInstances()
 
         # assert not done
-        self.obs_dim = observation_size*self.numInstances
-        self.act_dim = len(action_bounds[0])**self.numInstances
+        self.obs_dim = observation_size#*self.numInstances
+        self.act_dim = len(action_bounds[0])#*self.numInstances
         # for discrete instances, action_space should be defined in the subclass
-        if action_type == "continuous":
-            self.action_space = spaces.Box(action_bounds[1]*self.numInstances, action_bounds[0]*self.numInstances)
-
-        # initialize the viewer, get the window size
-        # initial here instead of in _render
-        # in image learning
-        # Give different observation space for different kind of envs
-        # if self._obs_type == 'parameter':
-        #     high = np.inf * np.ones(self.obs_dim)
-        #     low = -high
-        #     self.observation_space = spaces.Box(low, high)
-        # elif self._obs_type == 'image':
-        #     # Change to grayscale image later
-        #     self.observation_space = spaces.Box(low=0, high=255, shape=(self.screen_width, self.screen_height))
-        # else:
-        #     raise error.Error('Unrecognized observation type: {}'.format(self._obs_type))
-
-        self._seed()
-
-        # self.viewer = None
+        self.action_space = spaces.Box(action_bounds[0], action_bounds[1])
+        self.observation_space = spaces.Box(observation_bounds[0], observation_bounds[1])
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -62,17 +45,17 @@ class FlexEnv(gym.Env):
         if seed is None:
             pyFlex.setSceneRandSeed(-1)
         else:
+            np.random.seed(seed)
             pyFlex.setSceneRandSeed(seed)
-        self.np_random, seed = seeding.np_random(seed)
-
-        # print(seed)
+        # self.np_random, sseed = seeding.np_random(seed)
 
         return [seed]
 
     def do_simulation(self, tau, n_frames):
+
         done = False
         for _ in range(n_frames):
-            pyFlex.update_frame(tau)
+            pyFlex.update_frame(tau.flatten())
 
             done=pyFlex.sdl_main()
             if done:
@@ -81,31 +64,38 @@ class FlexEnv(gym.Env):
     def _step(self, action):
 
         done = self.do_simulation(action,self.frame_skip)
-        obs = self._get_obs()
+        obs = self.get_state()
         reward = 0
         info = {}
         return obs,reward,done,info
 
 
     def _reset(self):
+        # self._seed(self.seed)
         return pyFlex.resetScene()
 
-    def _get_obs(self):
-        return pyFlex.get_state()
+    def get_state(self):
+        state_vec = pyFlex.get_state()
+        part_state = state_vec[:-4*self.numInstances]
+        bar_state = state_vec[-4*self.numInstances::]
+
+        part_state = part_state.reshape([self.numInstances,int(part_state.shape[0]/self.numInstances),2])
+        bar_state = bar_state.reshape([self.numInstances,int(bar_state.shape[0]/self.numInstances),2])
+
+        full_state = np.concatenate([bar_state,part_state],axis=1)
+        return full_state
+
 
 if __name__ == '__main__':
     env = FlexEnv(frame_skip=5, observation_size=10, action_bounds=np.array([[-3, -3, -1, -1], [3, 3, 1, 1]]),scene=0)
 
-
-    main_loop_quit = False
     while True:
         pyFlex.resetScene()
         for _ in range(5000):
             # print(pyFlex.get_state())
             act = np.random.uniform([-2, -2, -1, -1]*env.numInstances, [2, 2, 1, 1]*env.numInstances,env.numInstances*4)
-            env.step(act)
-            main_loop_quit = pyFlex.sdl_main()
-            if main_loop_quit:
+            obs,rwd,done,info = env.step(act)
+            if done:
                 break
         else:
             continue

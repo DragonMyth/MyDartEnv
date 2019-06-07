@@ -77,8 +77,6 @@ class SimplerParticleCarvingCircleMatch(gym.Env):
         return [seed]
 
     def _step(self, action):
-        # self.t += self.dt
-        # print(action)
 
         action = np.clip(action * self.action_scale, self.action_low, self.action_high)
         action[2::] = action[2::] / np.linalg.norm(action[2::])
