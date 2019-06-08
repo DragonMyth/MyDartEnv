@@ -4,3 +4,4 @@ from gym.envs.flex.flex_env import FlexEnv
 
 from gym.envs.flex.granular_sweep_env import GranularSweepEnv
 from gym.envs.flex.goo_sweep_env import GooSweepEnv
+from gym.envs.flex.granular_sweep_voxel_bar_env import GranularSweepVoxelBarEnv
