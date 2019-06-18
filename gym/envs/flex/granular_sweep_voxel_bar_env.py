@@ -14,9 +14,9 @@ except ImportError as e:
 class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
     def __init__(self):
         self.resolution = 64
-        obs_size = self.resolution * self.resolution*2 + 10
+        obs_size = self.resolution * self.resolution*3 + 10
 
-        self.frame_skip = 5
+        self.frame_skip = 3
         action_bound = np.array([[-4, -4, -1, -1], [4, 4, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
@@ -32,6 +32,8 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
 
         self.circle_center = np.random.random_integers(0,3,self.numInstances)
         self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
+        #self.center_list = np.array([[1.5,1.5],[-1.5,-1.5]])
+        self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
         self.iter_num = 5000
 
     def _step(self, action):
@@ -41,16 +43,26 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
 
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
-        prev_distance = np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::], axis=1)
+        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
 
         done = self.do_simulation(action, self.frame_skip)
         curr_state = self.get_state()
-        curr_distance = np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::], axis=1)
+        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
 
-        rewards = prev_distance - curr_distance
-
+        rewards = prev_distance- curr_distance
+        # prev_obs = self._get_obs()
+        # densities = prev_obs[:, 10:10 + self.resolution * self.resolution]
+        # goals = prev_obs[:, -self.resolution * self.resolution::]
+        #
+        # prev_rewards =  np.sum(densities * goals, axis=1)
+        # done = self.do_simulation(action, self.frame_skip)
+        #
         info = {}
         obs = self._get_obs()
+        # densities = obs[:,10:10+self.resolution*self.resolution]
+        # goals = obs[:,-self.resolution*self.resolution::]
+        #
+        # rewards = np.sum(densities*goals,axis=1)-prev_rewards
         return obs, rewards, done, info
 
     def _get_obs(self):
@@ -64,20 +76,28 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
             bar_state = state[:4]
             bar_density = self.get_voxel_bar_density(bar_state)
             density = self.get_particle_density(part_state, normalized=True)
-            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]].flatten(), density.flatten(),bar_density.flatten()])
+            goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
+
+            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten(),bar_density.flatten(),goal_gradient.flatten()])
 
             obs_list.append(obs)
 
         return np.array(obs_list)
 
+    def get_goal_gradient(self,goal):
+        x, y = np.meshgrid(np.linspace(-4, 4, self.resolution), np.linspace(-4, 4, self.resolution))
+        sigma = 0.5
+
+        gradient = np.exp(-(((x - goal[0]) ** 2+(y-goal[1])**2) / (2.0 * sigma ** 2)))
+        return gradient
     def get_voxel_bar_density(self,bar_state):
         center = bar_state[0]
         direction = bar_state[1]
         ## length of bar is 0.7, half length is 0.35
-        end_point_1 = center+direction*0.35
-        end_point_2 = center-direction*0.35
+        end_point_1 = center+direction*0.7
+        end_point_2 = center-direction*0.7
 
-        step  = 1.0/20
+        step  = 1.0/40
         interp = np.arange(0,1+step,step)
         interp = np.expand_dims(interp, axis=1)
         interp = np.repeat(interp, 2, axis=1)
@@ -115,7 +135,8 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
         #     curriculum = 1 - np.exp(-0.005 * (self.iter_num - threshold))
         self.iter_num += 1
         self.circle_center = np.random.random_integers(0,3,self.numInstances)
-
+        for i in range(self.numInstances):
+            self.goal_gradients[i] = self.get_goal_gradient(self.center_list[self.circle_center[i]])
         # self.circle_center = np.ones((self.numInstances, 2)) * 1.5
         # self.circle_center = np.zeros((self.numInstances, 2)) + np.random.uniform(-2, 2,
         #                                                                           (self.numInstances, 2)) * curriculum

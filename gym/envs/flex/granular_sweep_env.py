@@ -31,7 +31,9 @@ class GranularSweepEnv(flex_env.FlexEnv):
         # self.circle_center = np.random.uniform(-2, 2, (self.numInstances, 2))
 
         self.circle_center = np.random.random_integers(0,3,self.numInstances)
-        self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
+        #self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
+        self.center_list = np.array([[1.5,1.5],[-1.5,-1.5]])
+
         self.iter_num = 5000
 
     def _step(self, action):
