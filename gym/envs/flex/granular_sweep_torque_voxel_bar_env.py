@@ -11,17 +11,17 @@ except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
+class GranularSweepTorqueVoxelBarEnv(flex_env.FlexEnv):
     def __init__(self):
         self.resolution = 64
         obs_size = self.resolution * self.resolution*3 + 10
 
         self.frame_skip = 3
-        action_bound = np.array([[-4, -4, -1, -1], [4, 4, 1, 1]])
+        action_bound = np.array([[-1, -1, -1], [1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -50,19 +50,10 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
         curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
 
         rewards = prev_distance- curr_distance
-        # prev_obs = self._get_obs()
-        # densities = prev_obs[:, 10:10 + self.resolution * self.resolution]
-        # goals = prev_obs[:, -self.resolution * self.resolution::]
-        #
-        # prev_rewards =  np.sum(densities * goals, axis=1)
-        # done = self.do_simulation(action, self.frame_skip)
-        #
+
         info = {}
         obs = self._get_obs()
-        # densities = obs[:,10:10+self.resolution*self.resolution]
-        # goals = obs[:,-self.resolution*self.resolution::]
-        #
-        # rewards = np.sum(densities*goals,axis=1)-prev_rewards
+
         return obs, rewards, done, info
 
     def _get_obs(self):
@@ -78,7 +69,7 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
             density = self.get_particle_density(part_state, normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
-            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten(),bar_density.flatten(),goal_gradient.flatten()])
+            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten(),bar_density.flatten(),goal_gradient.flatten()])
 
             obs_list.append(obs)
 
@@ -147,7 +138,7 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = GranularSweepVoxelBarEnv()
+    env = GranularSweepTorqueVoxelBarEnv()
     #
     # while True:
     #     env.reset()
@@ -165,11 +156,11 @@ if __name__ == '__main__':
     env.save_video = True
     # while True:
     env.reset()
-    for _ in range(100):
+    for _ in range(10000):
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((25, 4))
-
+        act = np.zeros((25, 3))
+        act[:,0]=10
         obs, rwd, done, info = env.step(act)
         if done:
             break

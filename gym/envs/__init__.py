@@ -607,6 +607,12 @@ register(
     max_episode_steps=1000,
 )
 
+register(
+    id='FlexGranularSweep-v2',
+    entry_point='gym.envs.flex:GranularSweepTorqueVoxelBarEnv',
+    max_episode_steps=1000,
+)
+
 
 register(
     id='FlexGooSweep-v0',
