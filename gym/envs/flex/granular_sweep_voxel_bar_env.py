@@ -78,7 +78,7 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
             density = self.get_particle_density(part_state, normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
-            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten(),bar_density.flatten(),goal_gradient.flatten()])
+            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten(),bar_density.flatten(),goal_gradient.flatten()])
 
             obs_list.append(obs)
 
