@@ -18,6 +18,7 @@ class FlexEnv(gym.Env):
                  dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0):
         assert obs_type in ('parameter', 'image')
         assert action_type in ("continuous", "discrete")
+
         pyFlex.chooseScene(scene)
         pyFlex.initialize()
 
@@ -41,6 +42,11 @@ class FlexEnv(gym.Env):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
 
+        self.save_video = False
+
+        self.video_path = "/home/dragonmyth/data"
+        self.step_cnt = 0
+
     def _seed(self, seed=None):
         if seed is None:
             pyFlex.setSceneRandSeed(-1)
@@ -52,17 +58,20 @@ class FlexEnv(gym.Env):
         return [seed]
 
     def do_simulation(self, tau, n_frames):
+        self.step_cnt += 1
 
         done = False
+        save = self.save_video
         for _ in range(n_frames):
-            pyFlex.update_frame(tau.flatten())
-
+            path = os.path.join(self.video_path, 'frame_%d.tga' % self.step_cnt)
+            pyFlex.update_frame(save,path,tau.flatten())
+            save = False
             done=pyFlex.sdl_main()
             if done:
                 break
+
         return done
     def _step(self, action):
-
         done = self.do_simulation(action,self.frame_skip)
         obs = self.get_state()
         reward = 0
@@ -84,7 +93,6 @@ class FlexEnv(gym.Env):
 
         full_state = np.concatenate([bar_state,part_state],axis=1)
         return full_state
-
 
 if __name__ == '__main__':
     env = FlexEnv(frame_skip=5, observation_size=10, action_bounds=np.array([[-3, -3, -1, -1], [3, 3, 1, 1]]),scene=0)
