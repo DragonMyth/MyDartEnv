@@ -46,6 +46,7 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
         prev_distance =np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]
 
         done = self.do_simulation(action, self.frame_skip)
+
         curr_state = self.get_state()
         #curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
         curr_distance = np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]
