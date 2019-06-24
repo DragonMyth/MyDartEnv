@@ -43,13 +43,16 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
 
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
-        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
+        prev_distance =np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]
 
         done = self.do_simulation(action, self.frame_skip)
         curr_state = self.get_state()
-        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
+        #curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
+        curr_distance = np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]
 
-        rewards = prev_distance- curr_distance
+        diff = prev_distance- curr_distance
+        diff = np.clip(diff,0,8)
+        rewards = np.sum(diff,axis=1)
         # prev_obs = self._get_obs()
         # densities = prev_obs[:, 10:10 + self.resolution * self.resolution]
         # goals = prev_obs[:, -self.resolution * self.resolution::]
@@ -162,7 +165,7 @@ if __name__ == '__main__':
     #     else:
     #         continue
     #     break
-    env.save_video = True
+    #env.save_video = True
     # while True:
     env.reset()
     for _ in range(100):

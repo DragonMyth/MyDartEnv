@@ -153,7 +153,7 @@ if __name__ == '__main__':
     #     else:
     #         continue
     #     break
-    env.save_video = True
+    #env.save_video = True
     # while True:
     env.reset()
     for _ in range(10000):
