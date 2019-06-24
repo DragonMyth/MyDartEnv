@@ -17,7 +17,7 @@ class GranularSweepTorqueVoxelBarEnv(flex_env.FlexEnv):
         obs_size = self.resolution * self.resolution*3 + 10
 
         self.frame_skip = 3
-        action_bound = np.array([[-1, -1, -1], [1, 1, 1]])
+        action_bound = np.array([[-1, -1, -np.pi/2], [1, 1, np.pi/2]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
@@ -69,7 +69,7 @@ class GranularSweepTorqueVoxelBarEnv(flex_env.FlexEnv):
             density = self.get_particle_density(part_state, normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
-            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten(),bar_density.flatten(),goal_gradient.flatten()])
+            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten(),bar_density.flatten(),goal_gradient.flatten()])
 
             obs_list.append(obs)
 

@@ -11,7 +11,7 @@ except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
+class GranularSweepGhostBarEnv(flex_env.FlexEnv):
     def __init__(self):
         self.resolution = 64
         obs_size = self.resolution * self.resolution*3 + 10
@@ -21,7 +21,7 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -46,6 +46,7 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
 
         prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
 
+        action = np.concatenate([action,centers],axis=1)
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
@@ -149,7 +150,7 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = GranularSweepVoxelBarEnv()
+    env = GranularSweepGhostBarEnv()
     #
     # while True:
     #     env.reset()
@@ -167,7 +168,7 @@ if __name__ == '__main__':
     env.save_video = True
     # while True:
     env.reset()
-    for _ in range(100):
+    for _ in range(1000):
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((25, 4))
