@@ -620,6 +620,13 @@ register(
 )
 
 register(
+    id='FlexGranularSweep-v4',
+    entry_point='gym.envs.flex:GranularSweepGhostBarLinearControlEnv',
+    max_episode_steps=1000,
+)
+
+
+register(
     id='FlexGooSweep-v0',
     entry_point='gym.envs.flex:GooSweepEnv',
     max_episode_steps=1000,

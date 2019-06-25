@@ -7,3 +7,4 @@ from gym.envs.flex.goo_sweep_env import GooSweepEnv
 from gym.envs.flex.granular_sweep_voxel_bar_env import GranularSweepVoxelBarEnv
 from gym.envs.flex.granular_sweep_torque_voxel_bar_env import GranularSweepTorqueVoxelBarEnv
 from gym.envs.flex.granular_sweep_ghost_bar_env import GranularSweepGhostBarEnv
+from gym.envs.flex.granular_sweep_ghost_bar_linear_control_env import GranularSweepGhostBarLinearControlEnv
