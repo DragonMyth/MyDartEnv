@@ -44,13 +44,13 @@ class GranularSweepGhostBarEnv(flex_env.FlexEnv):
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
 
-        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
+        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::], axis=1)
 
         action = np.concatenate([action,centers],axis=1)
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
-        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**2, axis=1)
+        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::], axis=1)
 
         rewards = prev_distance- curr_distance
         # prev_obs = self._get_obs()
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     #     else:
     #         continue
     #     break
-    env.save_video = True
+    #env.save_video = True
     # while True:
     env.reset()
     for _ in range(1000):
