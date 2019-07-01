@@ -97,7 +97,8 @@ class GranularSweepVoxelBarEnv(flex_env.FlexEnv):
     def get_voxel_bar_density(self,bar_state):
         center = bar_state[0]
         direction = bar_state[1]
-        ## length of bar is 0.7, half length is 0.35
+
+        ## length of bar is 1.4, half length is 0.7
         end_point_1 = center+direction*0.7
         end_point_2 = center-direction*0.7
 

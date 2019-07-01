@@ -11,10 +11,10 @@ except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class GranularSweepGhostBarEnv(flex_env.FlexEnv):
+class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
     def __init__(self):
-        self.resolution = 64
-        obs_size = self.resolution * self.resolution*3 + 10
+        self.resolution = 11
+        obs_size = self.resolution * self.resolution*2 + 10
 
         self.frame_skip = 3
         action_bound = np.array([[-4, -4, -1, -1], [4, 4, 1, 1]])
@@ -30,7 +30,7 @@ class GranularSweepGhostBarEnv(flex_env.FlexEnv):
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         # self.circle_center = np.random.uniform(-2, 2, (self.numInstances, 2))
 
-        self.circle_center = np.random.random_integers(0,1,self.numInstances)
+        self.circle_center = np.random.random_integers(0,0,self.numInstances)
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
         self.center_list = np.array([[0,1.5]])
         self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
@@ -80,7 +80,7 @@ class GranularSweepGhostBarEnv(flex_env.FlexEnv):
             density = self.get_particle_density(part_state, normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
-            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten(),bar_density.flatten(),goal_gradient.flatten()])
+            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten(),bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -136,7 +136,7 @@ class GranularSweepGhostBarEnv(flex_env.FlexEnv):
         # else:
         #     curriculum = 1 - np.exp(-0.005 * (self.iter_num - threshold))
         self.iter_num += 1
-        self.circle_center = np.random.random_integers(0,3,self.numInstances)
+        self.circle_center = np.random.random_integers(0,0,self.numInstances)
         for i in range(self.numInstances):
             self.goal_gradients[i] = self.get_goal_gradient(self.center_list[self.circle_center[i]])
         # self.circle_center = np.ones((self.numInstances, 2)) * 1.5
@@ -149,7 +149,7 @@ class GranularSweepGhostBarEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = GranularSweepGhostBarEnv()
+    env = GranularSweepGhostBarRawImgEnv()
     #
     # while True:
     #     env.reset()

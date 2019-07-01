@@ -625,6 +625,12 @@ register(
     max_episode_steps=1000,
 )
 
+register(
+    id='FlexGranularSweep-v5',
+    entry_point='gym.envs.flex:GranularSweepGhostBarRawImgEnv',
+    max_episode_steps=1000,
+)
+
 
 register(
     id='FlexGooSweep-v0',

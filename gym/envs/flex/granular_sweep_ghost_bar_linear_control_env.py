@@ -131,10 +131,12 @@ class GranularSweepGhostBarLinearControlEnv(flex_env.FlexEnv):
         # self._seed(self.seed)
         flex_env.FlexEnv._reset(self)
         threshold = 50
+
         # if (self.iter_num < threshold):
         #     curriculum = 0
         # else:
         #     curriculum = 1 - np.exp(-0.005 * (self.iter_num - threshold))
+
         self.iter_num += 1
         self.circle_center = np.random.random_integers(0,3,self.numInstances)
         for i in range(self.numInstances):
@@ -164,7 +166,7 @@ if __name__ == '__main__':
     #     else:
     #         continue
     #     break
-    env.save_video = True
+    # env.save_video = True
     # while True:
     env.reset()
     for _ in range(1000):
