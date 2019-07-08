@@ -13,8 +13,9 @@ except ImportError as e:
 
 class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
     def __init__(self):
-        self.resolution = 11
-        obs_size = self.resolution * self.resolution*2 + 10
+        self.resolution = 9
+        obs_size = self.resolution * self.resolution + 10
+        # obs_size = 10
 
         self.frame_skip = 3
         action_bound = np.array([[-4, -4, -1, -1], [4, 4, 1, 1]])
@@ -22,7 +23,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
         flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=3)
-
+        self.randGoalRange = 1
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -30,9 +31,12 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         # self.circle_center = np.random.uniform(-2, 2, (self.numInstances, 2))
 
-        self.circle_center = np.random.random_integers(0,0,self.numInstances)
+        self.circle_center = np.random.random_integers(0,self.randGoalRange,self.numInstances)
+
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
-        self.center_list = np.array([[0,1.5]])
+
+        self.center_list = np.array([[0,1.5],[0,-1.5]])
+
         self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
         self.iter_num = 5000
 
@@ -62,10 +66,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         #
         info = {}
         obs = self._get_obs()
-        # densities = obs[:,10:10+self.resolution*self.resolution]
-        # goals = obs[:,-self.resolution*self.resolution::]
-        #
-        # rewards = np.sum(densities*goals,axis=1)-prev_rewards
+
         return obs, rewards, done, info
 
     def _get_obs(self):
@@ -80,7 +81,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
             density = self.get_particle_density(part_state, normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
-            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten(),bar_density.flatten()])
+            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten()])
 
             obs_list.append(obs)
 
@@ -130,13 +131,12 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
     def _reset(self):
         # self._seed(self.seed)
         flex_env.FlexEnv._reset(self)
-        threshold = 50
         # if (self.iter_num < threshold):
         #     curriculum = 0
         # else:
         #     curriculum = 1 - np.exp(-0.005 * (self.iter_num - threshold))
         self.iter_num += 1
-        self.circle_center = np.random.random_integers(0,0,self.numInstances)
+        self.circle_center = np.random.random_integers(0,self.randGoalRange,self.numInstances)
         for i in range(self.numInstances):
             self.goal_gradients[i] = self.get_goal_gradient(self.center_list[self.circle_center[i]])
         # self.circle_center = np.ones((self.numInstances, 2)) * 1.5
