@@ -30,7 +30,7 @@ class GranularSweepGhostBarEnv(flex_env.FlexEnv):
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         # self.circle_center = np.random.uniform(-2, 2, (self.numInstances, 2))
 
-        self.circle_center = np.random.random_integers(0,1,self.numInstances)
+        self.circle_center = np.random.random_integers(0,0,self.numInstances)
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
         self.center_list = np.array([[0,1.5]])
         self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
@@ -136,7 +136,7 @@ class GranularSweepGhostBarEnv(flex_env.FlexEnv):
         # else:
         #     curriculum = 1 - np.exp(-0.005 * (self.iter_num - threshold))
         self.iter_num += 1
-        self.circle_center = np.random.random_integers(0,3,self.numInstances)
+        self.circle_center = np.random.random_integers(0,0,self.numInstances)
         for i in range(self.numInstances):
             self.goal_gradients[i] = self.get_goal_gradient(self.center_list[self.circle_center[i]])
         # self.circle_center = np.ones((self.numInstances, 2)) * 1.5
