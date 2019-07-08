@@ -13,9 +13,9 @@ except ImportError as e:
 
 class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
     def __init__(self):
-        self.resolution = 9
-        obs_size = self.resolution * self.resolution + 10
-        # obs_size = 10
+
+        self.resolution = 11
+        obs_size = self.resolution * self.resolution*2 + 4
 
         self.frame_skip = 3
         action_bound = np.array([[-4, -4, -1, -1], [4, 4, 1, 1]])
@@ -48,13 +48,13 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
 
-        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::], axis=1)
+        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]**3, axis=1)
 
         action = np.concatenate([action,centers],axis=1)
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
-        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::], axis=1)
+        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**3, axis=1)
 
         rewards = prev_distance- curr_distance
         # prev_obs = self._get_obs()
@@ -81,7 +81,8 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
             density = self.get_particle_density(part_state, normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
-            obs = np.concatenate([bar_state.flatten(), self.center_list[self.circle_center[i]],density.flatten()-goal_gradient.flatten()])
+
+            obs = np.concatenate([bar_state[2::].flatten(),density.flatten()-goal_gradient.flatten(),bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -137,6 +138,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         #     curriculum = 1 - np.exp(-0.005 * (self.iter_num - threshold))
         self.iter_num += 1
         self.circle_center = np.random.random_integers(0,self.randGoalRange,self.numInstances)
+
         for i in range(self.numInstances):
             self.goal_gradients[i] = self.get_goal_gradient(self.center_list[self.circle_center[i]])
         # self.circle_center = np.ones((self.numInstances, 2)) * 1.5
