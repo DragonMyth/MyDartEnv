@@ -56,7 +56,7 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
         curr_state = self.get_state()
         curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 6::]**3, axis=1)
 
-        energy = 0.01*np.linalg.norm(prev_state[:,:2]-curr_state[:,:2],axis=1)
+        energy = 0.1*np.sum(np.linalg.norm(prev_state[:, :2] - curr_state[:, :2], axis=1),axis=1)
 
 
         rewards = prev_distance- curr_distance
@@ -80,10 +80,10 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
             density = self.get_particle_density(part_state, normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
-            bar_pos = bar_state[0:2]
-            bar_vel = bar_state[3:5]
-            base_pos = bar_state[2]
-            base_angVel = np.array([np.cos(bar_state[5,0]),np.cos(bar_state[5,1])])
+            bar_pos = bar_state[0:2].flatten()
+            bar_vel = bar_state[3:5].flatten()
+            base_pos = bar_state[2].flatten()
+            base_angVel = np.array([np.cos(bar_state[5,0]),np.cos(bar_state[5,1])]).flatten()
 
             bar_info = np.concatenate([bar_pos,base_pos,bar_vel,base_angVel])
             obs = np.concatenate([bar_info.flatten(),density.flatten()-goal_gradient.flatten(),bar_density.flatten()])
