@@ -56,7 +56,12 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         curr_state = self.get_state()
         curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**3, axis=1)
 
+        energy = 0.1*np.linalg.norm(curr_state[:,2],axis=1)
+
+
         rewards = prev_distance- curr_distance
+
+        rewards[rewards<0.01]=energy[rewards<0.01]
         # prev_obs = self._get_obs()
         # densities = prev_obs[:, 10:10 + self.resolution * self.resolution]
         # goals = prev_obs[:, -self.resolution * self.resolution::]
