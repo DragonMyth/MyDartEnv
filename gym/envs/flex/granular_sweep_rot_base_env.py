@@ -56,12 +56,12 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
         curr_state = self.get_state()
         curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 6::]**3, axis=1)
 
-        energy = 0.1*np.sum(np.linalg.norm(prev_state[:, :2] - curr_state[:, :2], axis=1),axis=1)
+        energy = np.clip(np.sum(np.linalg.norm(prev_state[:, :2] - curr_state[:, :2], axis=1),axis=1),0,0.02)
 
 
         rewards = prev_distance- curr_distance
 
-        rewards[rewards<0.01]=energy[rewards<0.01]
+        rewards[rewards<0.02]=energy[rewards<0.02]
 
         info = {}
         obs = self._get_obs()
