@@ -48,15 +48,20 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
 
-        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 6::]**2, axis=1)
+        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 6::]**3, axis=1)
 
         action = np.concatenate([action,centers],axis=1)
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
-        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 6::]**2, axis=1)
+        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 6::]**3, axis=1)
+
+        energy = 0.01*np.linalg.norm(prev_state[:,:2]-curr_state[:,:2],axis=1)
+
 
         rewards = prev_distance- curr_distance
+
+        rewards[rewards<0.01]=energy[rewards<0.01]
 
         info = {}
         obs = self._get_obs()
