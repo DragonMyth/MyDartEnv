@@ -85,13 +85,15 @@ class FlexEnv(gym.Env):
 
     def get_state(self):
         state_vec = pyFlex.get_state()
-        part_state = state_vec[:-4*self.numInstances]
-        bar_state = state_vec[-4*self.numInstances::]
-
-        part_state = part_state.reshape([self.numInstances,int(part_state.shape[0]/self.numInstances),2])
-        bar_state = bar_state.reshape([self.numInstances,int(bar_state.shape[0]/self.numInstances),2])
-
-        full_state = np.concatenate([bar_state,part_state],axis=1)
+        # part_state = state_vec[:-4*self.numInstances]
+        # bar_state = state_vec[-4*self.numInstances::]
+        #
+        # part_state = part_state.reshape([self.numInstances,int(part_state.shape[0]/self.numInstances),2])
+        # bar_state = bar_state.reshape([self.numInstances,int(bar_state.shape[0]/self.numInstances),2])
+        #
+        # full_state = np.concatenate([bar_state,part_state],axis=1)
+        # return full_state
+        full_state = state_vec.reshape([self.numInstances,int(state_vec.shape[0]/self.numInstances),2])
         return full_state
 
 if __name__ == '__main__':
