@@ -15,27 +15,30 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 11
-        obs_size = self.resolution * self.resolution*2 + 4
+        obs_size = self.resolution * self.resolution*2 + 8
 
-        self.frame_skip = 3
+        self.frame_skip = 6
         action_bound = np.array([[-4, -4, -1, -1], [4, 4, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
         flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=3)
-        self.randGoalRange = 1
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        # self.circle_center = np.random.uniform(-2, 2, (self.numInstances, 2))
-
-        self.circle_center = np.random.random_integers(0,self.randGoalRange,self.numInstances)
 
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
         self.center_list = np.array([[0,1.5],[0,-1.5]])
+        # self.center_list = np.array([[0,0]])
+
+        # self.center_list = np.random.uniform(-2, 2, (100, 2))
+
+        self.randGoalRange = self.center_list.shape[0]-1
+
+        self.circle_center = np.random.random_integers(0, self.randGoalRange, self.numInstances)
 
         self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
         self.iter_num = 5000
@@ -48,28 +51,21 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
 
-        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::]**3, axis=1)
+        prev_distance = 0.1 * np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
 
-        action = np.concatenate([action,centers],axis=1)
+        action = np.concatenate([action, centers], axis=1)
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
-        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::]**3, axis=1)
+        curr_distance = 0.1 * np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
 
-        energy = 0.1*np.linalg.norm(curr_state[:,2],axis=1)
+        energy = np.clip(np.linalg.norm(prev_state[:, 0] - curr_state[:, 0], axis=1), 0, 0.02)
 
+        rewards = prev_distance - curr_distance
+        # old_rwd = rewards
+        # rewards[rewards < 0.02] = energy[rewards < 0.02]
 
-        rewards = prev_distance- curr_distance
-
-        rewards[rewards<0.01]=energy[rewards<0.01]
-        # prev_obs = self._get_obs()
-        # densities = prev_obs[:, 10:10 + self.resolution * self.resolution]
-        # goals = prev_obs[:, -self.resolution * self.resolution::]
-        #
-        # prev_rewards =  np.sum(densities * goals, axis=1)
-        # done = self.do_simulation(action, self.frame_skip)
-        #
-        info = {}
+        info = {'Total Reward': rewards[0], }
         obs = self._get_obs()
 
         return obs, rewards, done, info
@@ -87,7 +83,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
 
 
-            obs = np.concatenate([bar_state[2::].flatten(),density.flatten()-goal_gradient.flatten(),bar_density.flatten()])
+            obs = np.concatenate([bar_state.flatten(),density.flatten()-goal_gradient.flatten(),bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -95,7 +91,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
 
     def get_goal_gradient(self,goal):
         x, y = np.meshgrid(np.linspace(-4, 4, self.resolution), np.linspace(-4, 4, self.resolution))
-        sigma = 0.5
+        sigma = 0.7
 
         gradient = np.exp(-(((x - goal[0]) ** 2+(y-goal[1])**2) / (2.0 * sigma ** 2)))
         return gradient
@@ -116,7 +112,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
 
         H, xedges, yedges = np.histogram2d(interp_y, interp_x, bins=[self.resolution, self.resolution],
                                            range=[[-4, 4], [-4, 4]])
-        H = np.ceil(H/np.max(H))
+        H = (H>0).astype(int)
 
         return H
     def get_particle_density(self, particles, normalized=True):

@@ -23,19 +23,25 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
         flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4)
-        self.randGoalRange = 0
+
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         # self.circle_center = np.random.uniform(-2, 2, (self.numInstances, 2))
+        # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
+
+        # self.center_list = np.array([[0,1.5],[0,-1.5]])
+        # self.center_list = np.array([[0,0]])
+
+
+        self.center_list = np.random.uniform(-2,2,(100,2))
+
+        self.randGoalRange = self.center_list.shape[0]
 
         self.circle_center = np.random.random_integers(0,self.randGoalRange,self.numInstances)
 
-        # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
-
-        self.center_list = np.array([[0,0]])
 
         self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
         self.iter_num = 5000
@@ -45,40 +51,70 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
         prev_state = self.get_state()
         centers = self.center_list[self.circle_center]
 
-        expanded_centers = np.expand_dims(centers, axis=1)
-        expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
 
-        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 6::]**3, axis=1)
 
-        action = np.concatenate([action,centers],axis=1)
+
+        prev_rot = prev_state[:,2]
+        transformed_centers = self.get_transformed_goal(centers,prev_rot)
+
+        expanded_centers_prev = np.expand_dims(transformed_centers, axis=1)
+        expanded_centers_prev = np.repeat(expanded_centers_prev, prev_state.shape[1], axis=1)
+
+        prev_distance = 0.1*np.sum(np.linalg.norm(prev_state - expanded_centers_prev, axis=2)[:, 6::]**3, axis=1)
+
+        action = np.concatenate([action,transformed_centers],axis=1)
         done = self.do_simulation(action, self.frame_skip)
 
+
         curr_state = self.get_state()
-        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 6::]**3, axis=1)
+
+        curr_rot = curr_state[:,2]
+
+        transformed_centers = self.get_transformed_goal(centers,curr_rot)
+
+        expanded_centers_curr = np.expand_dims(transformed_centers, axis=1)
+        expanded_centers_curr = np.repeat(expanded_centers_curr, prev_state.shape[1], axis=1)
+
+        curr_distance = 0.1*np.sum(np.linalg.norm(curr_state - expanded_centers_curr, axis=2)[:, 6::]**3, axis=1)
 
         energy = np.clip(np.sum(np.linalg.norm(prev_state[:, :2] - curr_state[:, :2], axis=1),axis=1),0,0.02)
 
 
         rewards = prev_distance- curr_distance
-
+        old_rwd = rewards
         rewards[rewards<0.02]=energy[rewards<0.02]
 
-        info = {}
+        info = {'Total Reward': rewards[0],'Distance Reward':old_rwd[0]}
         obs = self._get_obs()
 
         return obs, rewards, done, info
 
+    def get_transformed_goal(self,goal,rot):
+
+        # rot[:,0] = 0
+        # rot[:,1] = 1
+        new_prev_cent_x = goal[:, 0] * rot[:, 0] + goal[:, 1] * rot[:, 1]
+        new_prev_cent_x = np.expand_dims(new_prev_cent_x,1)
+
+        new_prev_cent_y = -goal[:, 0] * rot[:, 1] + goal[:, 1] * rot[:, 0]
+        new_prev_cent_y = np.expand_dims(new_prev_cent_y,1)
+
+
+        return np.concatenate([new_prev_cent_x, new_prev_cent_y], axis=1)
     def _get_obs(self):
 
         states = self.get_state()
         obs_list = []
+
+        transformed_goals = self.get_transformed_goal(self.center_list[self.circle_center],states[:,2])
         for i in range(self.numInstances):
             state = states[i]
             part_state = state[6::]
             bar_state = state[:6]
             bar_density = self.get_voxel_bar_density(bar_state)
             density = self.get_particle_density(part_state, normalized=True)
-            goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]])
+
+            goal_gradient = self.get_goal_gradient(transformed_goals[i])
 
             bar_pos = bar_state[0:2].flatten()
             bar_vel = bar_state[3:5].flatten()
@@ -198,7 +234,7 @@ if __name__ == '__main__':
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((25, 5))
-
+        act[:,4]=1
         obs, rwd, done, info = env.step(act)
         if done:
             break
