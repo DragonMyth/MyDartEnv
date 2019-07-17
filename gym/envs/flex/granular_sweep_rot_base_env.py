@@ -38,7 +38,7 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
 
         self.center_list = np.random.uniform(-2,2,(100,2))
 
-        self.randGoalRange = self.center_list.shape[0]
+        self.randGoalRange = self.center_list.shape[0]-1
 
         self.circle_center = np.random.random_integers(0,self.randGoalRange,self.numInstances)
 
@@ -82,7 +82,7 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
 
         rewards = prev_distance- curr_distance
         old_rwd = rewards
-        rewards[rewards<0.02]=energy[rewards<0.02]
+        # rewards[rewards<0.02]=energy[rewards<0.02]
 
         info = {'Total Reward': rewards[0],'Distance Reward':old_rwd[0]}
         obs = self._get_obs()
@@ -140,8 +140,6 @@ class GranularSweepRotBaseEnv(flex_env.FlexEnv):
 
 
         directionBar1 = np.array([0,1])
-
-
         directionBar2 = np.array([1,0])
 
         ## length of bar is 0.7, half length is 0.35
