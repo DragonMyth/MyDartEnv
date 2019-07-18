@@ -31,8 +31,8 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
 
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
-        self.center_list = np.array([[0,1.5],[0,-1.5]])
-        # self.center_list = np.array([[0,0]])
+        # self.center_list = np.array([[0,1.5],[0,-1.5]])
+        self.center_list = np.array([[0,0]])
 
         # self.center_list = np.random.uniform(-2, 2, (100, 2))
 
