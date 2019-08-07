@@ -93,7 +93,7 @@ class FlexEnv(gym.Env):
         #
         # full_state = np.concatenate([bar_state,part_state],axis=1)
         # return full_state
-        full_state = state_vec.reshape([self.numInstances,int(state_vec.shape[0]/self.numInstances),2])
+        full_state = state_vec.reshape([self.numInstances,int(state_vec.shape[0]/self.numInstances),3])
         return full_state
 
 if __name__ == '__main__':
