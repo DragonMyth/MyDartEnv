@@ -11,19 +11,18 @@ except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
+class PlasticSpringReshapingEnv(flex_env.FlexEnv):
     def __init__(self):
 
-        self.resolution = 11
-        obs_size = self.resolution * self.resolution * 2 + 8
-        # obs_size = self.resolution * self.resolution * 2 + 8
+        self.resolution = 32
+        obs_size = self.resolution * self.resolution * 3 + 8
 
         self.frame_skip = 10
         action_bound = np.array([[-4, -4, -1, -1, -1], [4, 4, 1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -33,9 +32,9 @@ class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
         # self.center_list = np.array([[0,1.5],[0,-1.5]])
-        # self.center_list = np.array([[0,0]])
+        self.center_list = np.array([[0,0]])
 
-        self.center_list = np.random.uniform(-2, 2, (100, 2))
+        # self.center_list = np.random.uniform(-2, 2, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0] - 1
 
@@ -110,12 +109,12 @@ class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
             bar_state[1] = bar_rot_trans
             bar_state[2] = bar_vel_trans
 
-            bar_density = self.get_voxel_bar_density(bar_state)
+            bar_density = self.get_voxel_bar_density(bar_state, self.global_rot[i])
             density = self.get_particle_density(part_state, self.global_rot[i], normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]], self.global_rot[i])
 
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten() - goal_gradient.flatten(), bar_density.flatten()])
+                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(), bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -131,14 +130,14 @@ class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
         gradient = np.exp(-(((x - goal_rot[0]) ** 2 + (y - goal_rot[1]) ** 2) / (2.0 * sigma ** 2)))
         return gradient
 
-    def get_voxel_bar_density(self, bar_state):
+    def get_voxel_bar_density(self, bar_state, global_rot):
 
         center = bar_state[0]
         direction = bar_state[1].copy()
         direction[1] = -direction[1]
-        ## length of bar is 0.7, half length is 0.35
-        end_point_1 = center + direction * 0.7
-        end_point_2 = center - direction * 0.7
+        ## half length is 1.5
+        end_point_1 = center + direction * 1.5
+        end_point_2 = center - direction * 1.5
 
         step = 1.0 / 40
         interp = np.arange(0, 1 + step, step)
@@ -163,12 +162,9 @@ class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
         H, xedges, yedges = np.histogram2d(y_pos, x_pos, bins=[self.resolution, self.resolution],
                                            range=[[-4, 4], [-4, 4]])
 
-        # H = np.clip(H,0,1000)
-
         if normalized:
-
-            H = H ** (1.0 / 3)
-            H = H / 5
+            H = H ** (1.0 / 2)
+            H=H/10
 
         return H
 
@@ -185,11 +181,13 @@ class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
 
         return self._get_obs()
 
-
     def _render(self, mode='human', close=False):
         if (self.disableViewer):
             return
         else:
+            if not self.screen:
+                pg.init()
+                self.screen = pg.display.set_mode(self.screen_size, display=pg.OPENGL)
             width = self.screen_size[0]
             height = self.screen_size[1]
             gap = self.sub_screen_gap
@@ -213,13 +211,18 @@ class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
         lr.fill([200, 200, 200])
 
         bar_map = obs[0, -self.resolution * self.resolution::]
+        goal_map = obs[0, 8 + self.resolution * self.resolution:8+2*(self.resolution * self.resolution)]
+
         part_map = obs[0, 8:8 + self.resolution * self.resolution]
 
         bar_map = np.reshape(bar_map, (self.resolution, self.resolution)).astype(np.float64)
+        goal_map = np.reshape(goal_map, (self.resolution, self.resolution)).astype(np.float64)
         part_map = np.reshape(part_map, (self.resolution, self.resolution)).astype(np.float64)
 
         self.draw_grid(tl, bar_map, 0, 1)
-        self.draw_grid(lr, part_map, -1, 2)
+        self.draw_grid(tr, goal_map, 0, 1)
+
+        self.draw_grid(lr, part_map, 0, 1)
 
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() / 2 + self.sub_screen_gap / 2, 0))
@@ -246,15 +249,14 @@ class GranularSweepRawImgGhostControlEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = GranularSweepRawImgGhostControlEnv()
+    env = PlasticSpringReshapingEnv()
 
     env.reset()
     for _ in range(1000):
-        env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((25, 5))
-        act[:, -1] = 1
+        act = np.zeros((16, 5))
+        act[:, -1] = 0
         obs, rwd, done, info = env.step(act)
         if done:
             break

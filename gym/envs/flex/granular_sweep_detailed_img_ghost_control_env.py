@@ -1,5 +1,5 @@
 import os
-
+import pygame as pg
 from gym import error, spaces
 from gym.utils import seeding
 import numpy as np
@@ -15,7 +15,7 @@ class GranularSweepDetailedImgGhostControlEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        obs_size = self.resolution * self.resolution * 2 + 8
+        obs_size = self.resolution * self.resolution *3 + 8
 
         self.frame_skip = 10
         action_bound = np.array([[-4, -4, -1, -1, -1], [4, 4, 1, 1, 1]])
@@ -114,7 +114,7 @@ class GranularSweepDetailedImgGhostControlEnv(flex_env.FlexEnv):
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]], self.global_rot[i])
 
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten() - goal_gradient.flatten(), bar_density.flatten()])
+                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(), bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -133,7 +133,8 @@ class GranularSweepDetailedImgGhostControlEnv(flex_env.FlexEnv):
     def get_voxel_bar_density(self, bar_state):
 
         center = bar_state[0]
-        direction = bar_state[1]
+        direction = bar_state[1].copy()
+        direction[1] = -direction[1]
         ## length of bar is 0.7, half length is 0.35
         end_point_1 = center + direction * 0.7
         end_point_2 = center - direction * 0.7
@@ -164,8 +165,8 @@ class GranularSweepDetailedImgGhostControlEnv(flex_env.FlexEnv):
         # H = np.clip(H,0,1000)
 
         if normalized:
-            H = H / particles.shape[0]
             H = H ** (1.0 / 3)
+            H = H /10
 
         return H
 
@@ -182,12 +183,81 @@ class GranularSweepDetailedImgGhostControlEnv(flex_env.FlexEnv):
 
         return self._get_obs()
 
+    def _render(self, mode='human', close=False):
+        if (self.disableViewer):
+            return
+        else:
+            if not self.screen:
+                pg.init()
+                self.screen = pg.display.set_mode(self.screen_size, display=pg.OPENGL)
+            width = self.screen_size[0]
+            height = self.screen_size[1]
+            gap = self.sub_screen_gap
+
+            tl_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
+            tr_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
+            ll_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
+            lr_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
+            self.pygame_draw([tl_surface, tr_surface, ll_surface, lr_surface])
+            return flex_env.FlexEnv._render(self)
+    def pygame_draw(self, surfaces):
+        obs = self._get_obs()
+        tl = surfaces[0]
+        tr = surfaces[1]
+        ll = surfaces[2]
+        lr = surfaces[3]
+
+        tl.fill([200, 200, 200])
+        tr.fill([200, 200, 200])
+        ll.fill([200, 200, 200])
+        lr.fill([200, 200, 200])
+
+        bar_map = obs[0, -self.resolution * self.resolution::]
+        goal_map = obs[0, 8 + self.resolution * self.resolution:8+2*(self.resolution * self.resolution)]
+
+        part_map = obs[0, 8:8 + self.resolution * self.resolution]
+
+        bar_map = np.reshape(bar_map, (self.resolution, self.resolution)).astype(np.float64)
+        goal_map = np.reshape(goal_map, (self.resolution, self.resolution)).astype(np.float64)
+        part_map = np.reshape(part_map, (self.resolution, self.resolution)).astype(np.float64)
+
+        self.draw_grid(tl, bar_map, 0, 1)
+        self.draw_grid(tr, goal_map, 0, 1)
+
+        self.draw_grid(lr, part_map, 0, 1)
+
+        self.screen.blit(tl, (0, 0))
+        self.screen.blit(tr, (self.screen.get_width() / 2 + self.sub_screen_gap / 2, 0))
+        self.screen.blit(ll, (0, self.screen.get_height() / 2 + self.sub_screen_gap / 2))
+
+        self.screen.blit(lr, (
+        self.screen.get_width() / 2 + self.sub_screen_gap / 2, self.screen.get_height() / 2 + self.sub_screen_gap / 2))
+
+    def draw_grid(self, surface, data, min, scale):
+        data = (data - min) / scale
+        w_gap = surface.get_width() / data.shape[0]
+        h_gap = surface.get_height() / data.shape[1]
+
+        for y in range(data.shape[0]):
+            for x in range(data.shape[1]):
+                color = np.array([1.0, 1.0, 1.0])
+                color *= data[y, x]
+                color = np.clip(color, 0, 1)
+
+                final_color = 255 * (np.array([1, 0, 0]) * color + np.array([0, 0, 1]) * (1 - color))
+                pg.draw.rect(surface, final_color,
+                                 pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
+
+
 
 if __name__ == '__main__':
-    env = GranularSweepRawImgGhostControlEnv()
-
+    import gym
+    from gym.wrappers.monitoring import Monitor
+    env = gym.make("FlexGranularSweep-v1")
+    env = Monitor(env,'/home/yzhang',force=True)
     env.reset()
-    for _ in range(1000):
+    for _ in range(100):
+        env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((25, 5))

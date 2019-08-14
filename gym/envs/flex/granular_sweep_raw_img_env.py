@@ -32,9 +32,9 @@ class GranularSweepRawImgEnv(flex_env.FlexEnv):
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
         # self.center_list = np.array([[0,1.5],[0,-1.5]])
-        # self.center_list = np.array([[0,0]])
+        self.center_list = np.array([[0,0]])
 
-        self.center_list = np.random.uniform(-2, 2, (100, 2))
+        # self.center_list = np.random.uniform(-2, 2, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]-1
 
@@ -127,7 +127,8 @@ class GranularSweepRawImgEnv(flex_env.FlexEnv):
     def get_voxel_bar_density(self,bar_state,target_bar_state,global_rot):
 
         center = bar_state[0]
-        direction = bar_state[1]
+        direction = bar_state[1].copy()
+        direction[1] = -direction[1]
         ## length of bar is 1.4, half length is 0.7
         end_point_1 = center+direction*0.7
         end_point_2 = center-direction*0.7

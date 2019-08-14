@@ -6,7 +6,7 @@ import numpy as np
 from os import path
 import gym
 import six
-
+import pygame as pg
 try:
     import bindings as pyFlex
 except ImportError as e:
@@ -15,9 +15,17 @@ except ImportError as e:
 
 class FlexEnv(gym.Env):
     def __init__(self, frame_skip, observation_size, observation_bounds,action_bounds,
-                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0):
+                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0, disableViewer = True):
         assert obs_type in ('parameter', 'image')
         assert action_type in ("continuous", "discrete")
+
+        self.disableViewer = disableViewer
+        self.screen = None
+        self.screen_size = (400,400)
+        self.sub_screen_gap = 4
+        if not self.disableViewer:
+            pg.init()
+            self.screen = pg.display.set_mode(self.screen_size,display=pg.OPENGL)
 
         pyFlex.chooseScene(scene)
         pyFlex.initialize()
@@ -31,14 +39,13 @@ class FlexEnv(gym.Env):
         self.numInstances = pyFlex.getNumInstances()
 
         # assert not done
-        self.obs_dim = observation_size#*self.numInstances
-        self.act_dim = len(action_bounds[0])#*self.numInstances
+        self.obs_dim = observation_size
+        self.act_dim = len(action_bounds[0])
         # for discrete instances, action_space should be defined in the subclass
         self.action_space = spaces.Box(action_bounds[0], action_bounds[1])
         self.observation_space = spaces.Box(observation_bounds[0], observation_bounds[1])
 
         self.metadata = {
-            'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
 
@@ -96,6 +103,13 @@ class FlexEnv(gym.Env):
         full_state = state_vec.reshape([self.numInstances,int(state_vec.shape[0]/self.numInstances),3])
         return full_state
 
+    def _render(self, mode='human', close=False):
+        if(self.disableViewer):
+            return
+        else:
+            pg.display.update()
+            img = pg.surfarray.array3d(self.screen).transpose([1,0,2])
+            return img
 if __name__ == '__main__':
     env = FlexEnv(frame_skip=5, observation_size=10, action_bounds=np.array([[-3, -3, -1, -1], [3, 3, 1, 1]]),scene=0)
 
