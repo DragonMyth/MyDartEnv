@@ -32,9 +32,9 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
         # self.center_list = np.array([[0,1.5],[0,-1.5]])
-        self.center_list = np.array([[0,0]])
+        # self.center_list = np.array([[0,0]])
 
-        # self.center_list = np.random.uniform(-2, 2, (100, 2))
+        self.center_list = np.random.uniform(-2, 2, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]-1
 
@@ -64,7 +64,7 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
 
         energy = np.clip(np.linalg.norm(prev_state[:, 0] - curr_state[:, 0], axis=1), 0, 0.02)
 
-        rewards = (prev_distance - curr_distance)+0.001*rwd_concentration #concentration term tells how many parts are within the goal region
+        rewards = (prev_distance - curr_distance) #concentration term tells how many parts are within the goal region
         # old_rwd = rewards
         # rewards[rewards < 0.02] = energy[rewards < 0.02]
 
@@ -93,7 +93,6 @@ class GranularSweepGhostBarRawImgEnv(flex_env.FlexEnv):
             part_state = state[4::]
 
             bar_state = state[:4]
-
 
             bar_density = self.get_voxel_bar_density(bar_state,rand_rot_vec[i])
             density = self.get_particle_density(part_state, rand_rot_vec[i],normalized=True)
@@ -201,7 +200,7 @@ if __name__ == '__main__':
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((25, 5))
-
+        # act[:,-1]=1
         obs, rwd, done, info = env.step(act)
         if done:
             break
