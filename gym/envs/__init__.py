@@ -596,53 +596,44 @@ register(
 )
 
 #FLEX
+
 register(
     id='FlexGranularSweep-v0',
-    entry_point='gym.envs.flex:GranularSweepEnv',
-    max_episode_steps=1000,
+    entry_point='gym.envs.flex:GranularSweepRawImgEnv',
+    max_episode_steps=3000,
 )
+
+
 register(
     id='FlexGranularSweep-v1',
-    entry_point='gym.envs.flex:GranularSweepVoxelBarEnv',
+    entry_point='gym.envs.flex:GranularSweepDetailedImgGhostControlEnv',
     max_episode_steps=1000,
 )
 
 register(
     id='FlexGranularSweep-v2',
-    entry_point='gym.envs.flex:GranularSweepTorqueVoxelBarEnv',
+    entry_point='gym.envs.flex:GranularSweepRawImgGhostControlEnv',
     max_episode_steps=1000,
 )
 
 register(
     id='FlexGranularSweep-v3',
-    entry_point='gym.envs.flex:GranularSweepGhostBarEnv',
-    max_episode_steps=1000,
-)
-
-# register(
-#     id='FlexGranularSweep-v4',
-#     entry_point='gym.envs.flex:GranularSweepGhostBarLinearControlEnv',
-#     max_episode_steps=1000,
-# )
-
-register(
-    id='FlexGranularSweep-v5',
-    entry_point='gym.envs.flex:GranularSweepGhostBarRawImgEnv',
+    entry_point='gym.envs.flex:GranularSweepRawImgRwdMeanStdEnv',
     max_episode_steps=1000,
 )
 
 register(
-    id='FlexGranularSweep-v6',
-    entry_point='gym.envs.flex:GranularSweepRotBaseEnv',
+    id='FlexPlasticReshaping-v0',
+    entry_point='gym.envs.flex:PlasticReshapingEnv',
     max_episode_steps=1000,
 )
-
 
 register(
-    id='FlexGooSweep-v0',
-    entry_point='gym.envs.flex:GooSweepEnv',
+    id='FlexPlasticReshaping-v1',
+    entry_point='gym.envs.flex:PlasticSpringReshapingEnv',
     max_episode_steps=1000,
 )
+
 
 # Atari
 # ----------------------------------------
