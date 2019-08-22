@@ -4,6 +4,7 @@ from gym import error, spaces
 from gym.utils import seeding
 import numpy as np
 from gym.envs.flex import flex_env
+import pygame as pg
 
 try:
     import bindings as pyFlex
@@ -15,14 +16,14 @@ class GranularSweepDetailedImgGhostControlEnvManualControl(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        obs_size = self.resolution * self.resolution * 2 + 8
+        obs_size = self.resolution * self.resolution * 3 + 8
 
         self.frame_skip = 10
         action_bound = np.array([[-4, -4, -1, -1, -1], [4, 4, 1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6,disableViewer=False)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -113,7 +114,7 @@ class GranularSweepDetailedImgGhostControlEnvManualControl(flex_env.FlexEnv):
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]], self.global_rot[i])
 
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten() - goal_gradient.flatten(), bar_density.flatten()])
+                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(), bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -164,8 +165,8 @@ class GranularSweepDetailedImgGhostControlEnvManualControl(flex_env.FlexEnv):
         # H = np.clip(H,0,1000)
 
         if normalized:
-            H = H / particles.shape[0]
             H = H ** (1.0 / 3)
+            H = H / 10
 
         return H
 
@@ -181,14 +182,81 @@ class GranularSweepDetailedImgGhostControlEnvManualControl(flex_env.FlexEnv):
 
         return self._get_obs()
 
+    def _render(self, mode='human', close=False):
+        if (self.disableViewer):
+            return
+        else:
+            if not self.screen:
+                pg.init()
+                self.screen = pg.display.set_mode(self.screen_size, display=pg.OPENGL)
+            width = self.screen_size[0]
+            height = self.screen_size[1]
+            gap = self.sub_screen_gap
+
+            tl_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
+            tr_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
+            ll_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
+            lr_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
+            self.pygame_draw([tl_surface, tr_surface, ll_surface, lr_surface])
+            return flex_env.FlexEnv._render(self)
+
+    def pygame_draw(self, surfaces):
+        obs = self._get_obs()
+        tl = surfaces[0]
+        tr = surfaces[1]
+        ll = surfaces[2]
+        lr = surfaces[3]
+
+        tl.fill([200, 200, 200])
+        tr.fill([200, 200, 200])
+        ll.fill([200, 200, 200])
+        lr.fill([200, 200, 200])
+
+        bar_map = obs[0, -self.resolution * self.resolution::]
+        goal_map = obs[0, 8 + self.resolution * self.resolution:8 + 2 * (self.resolution * self.resolution)]
+
+        part_map = obs[0, 8:8 + self.resolution * self.resolution]
+
+        bar_map = np.reshape(bar_map, (self.resolution, self.resolution)).astype(np.float64)
+        goal_map = np.reshape(goal_map, (self.resolution, self.resolution)).astype(np.float64)
+        part_map = np.reshape(part_map, (self.resolution, self.resolution)).astype(np.float64)
+
+        self.draw_grid(tl, bar_map, 0, 1)
+        self.draw_grid(tr, goal_map, 0, 1)
+
+        self.draw_grid(lr, part_map, 0, 1)
+
+        self.screen.blit(tl, (0, 0))
+        self.screen.blit(tr, (self.screen.get_width() / 2 + self.sub_screen_gap / 2, 0))
+        self.screen.blit(ll, (0, self.screen.get_height() / 2 + self.sub_screen_gap / 2))
+
+        self.screen.blit(lr, (
+            self.screen.get_width() / 2 + self.sub_screen_gap / 2,
+            self.screen.get_height() / 2 + self.sub_screen_gap / 2))
+
+    def draw_grid(self, surface, data, min, scale):
+        data = (data - min) / scale
+        w_gap = surface.get_width() / data.shape[0]
+        h_gap = surface.get_height() / data.shape[1]
+
+        for y in range(data.shape[0]):
+            for x in range(data.shape[1]):
+                color = np.array([1.0, 1.0, 1.0])
+                color *= data[y, x]
+                color = np.clip(color, 0, 1)
+
+                final_color = 255 * (np.array([1, 0, 0]) * color + np.array([0, 0, 1]) * (1 - color))
+                pg.draw.rect(surface, final_color,
+                             pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
+
 
 def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
     bar_state = obs[0, 0:4]
 
     act = np.zeros((1, 5))
 
-    linear_scale = 2
-    ang_scale = 0.1 * np.pi
+    linear_scale = 5
+    ang_scale = np.pi / 6
     linear_relative_target = np.zeros(2)
     target_angle = 0
     ghost_cont = 0
@@ -232,147 +300,55 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
     return act
 
 
-def pygame_draw(screen, surfaces, obs):
-    tl = surfaces[0]
-    tr = surfaces[1]
-    ll = surfaces[2]
-    lr = surfaces[3]
-
-    tl.fill([200, 200, 200])
-    tr.fill([200, 200, 200])
-    ll.fill([200, 200, 200])
-    lr.fill([200, 200, 200])
-
-    bar_map = obs[0, -32 * 32::]
-    part_map = obs[0, 8:8 + 32 * 32]
-
-    bar_map = np.reshape(bar_map, (32, 32)).astype(np.float64)
-    part_map = np.reshape(part_map, (32, 32)).astype(np.float64)
-
-    draw_grid(tl, bar_map, 0, 1)
-    draw_grid(lr, part_map, -1, 2)
-
-    screen.blit(tl, (0, 0))
-    screen.blit(tr, (screen.get_width() / 2 + 2, 0))
-    screen.blit(ll, (0, screen.get_height() / 2 + 2))
-
-    screen.blit(lr, (screen.get_width() / 2 + 2, screen.get_height() / 2 + 2))
-    pygame.display.update()
-
-
-def draw_grid(surface, data, min, scale):
-    data = (data - min) / scale
-    w_gap = surface.get_width() / data.shape[0]
-    h_gap = surface.get_height() / data.shape[1]
-
-    for y in range(data.shape[0]):
-        for x in range(data.shape[1]):
-            color = np.array([1.0, 1.0, 1.0])
-            color *= data[y, x]
-            color = np.clip(color, 0, 1)
-
-            final_color = 255 * (np.array([1, 0, 0]) * color + np.array([0, 0, 1]) * (1 - color))
-            pygame.draw.rect(surface, final_color, pygame.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
-
-
 if __name__ == '__main__':
-    import pygame
-
-    pygame.init()
-    gap = 4
-    width = 400
-    height = 400
-    window = pygame.display.set_mode((width, height))
-
-    tl_rect = pygame.Rect(0, 0, width / 2 - gap / 2, height / 2 - gap / 2)
-    tr_rect = pygame.Rect(width / 2 + gap / 2, 0, width, height / 2 - gap / 2)
-
-    ll_rect = pygame.Rect(0, height / 2 + gap / 2, width / 2 - gap / 2, height)
-
-    lr_rect = pygame.Rect(0, 0, width / 2 + gap / 2, height / 2 + gap / 2)
-
-    tl_surface = pygame.Surface((width / 2, height / 2))
-    tr_surface = pygame.Surface((width / 2, height / 2))
-    ll_surface = pygame.Surface((width / 2, height / 2))
-    lr_surface = pygame.Surface((width / 2, height / 2))
 
     env = GranularSweepDetailedImgGhostControlEnvManualControl()
 
     obs = env.reset()
     cnt = 0
+    paused = True
     while cnt < 1000:
         act = np.zeros((1, 5))
 
-        events = pygame.event.get()
+        events = pg.event.get()
 
-        for event in events:
-            key_pressed = False
-            W = False
-            A = False
-            S = False
-            D = False
-            CW = False
-            CCW = False
-            Ghost = False
-            skip = False
-            if event.type == pygame.KEYDOWN:
-                key_pressed = False
+        W = False
+        A = False
+        S = False
+        D = False
+        CW = False
+        CCW = False
+        Ghost = False
+        skip = False
+        keys = pg.key.get_pressed()
 
-                if event.key == pygame.K_w:
-                    W = True
-                    key_pressed = True
+        if keys[pg.K_r]:
+            paused = False
+        if keys[pg.K_p]:
+            paused = True
+        if keys[pg.K_w]:
+            W = True
+        if keys[pg.K_a]:
+            A = True
+        if keys[pg.K_s]:
+            S = True
+        if keys[pg.K_d]:
+            D = True
 
-                if event.key == pygame.K_a:
-                    A = True
-                    key_pressed = True
+        if keys[pg.K_j]:
+            CCW = True
 
-                if event.key == pygame.K_s:
-                    S = True
-                    key_pressed = True
+        if keys[pg.K_k]:
+            CW = True
 
-                if event.key == pygame.K_d:
-                    D = True
-                    key_pressed = True
+        if keys[pg.K_SPACE]:
+            skip = True
 
-                if event.key == pygame.K_j:
-                    CCW = True
-                    key_pressed = True
-
-                if event.key == pygame.K_k:
-                    CW = True
-                    key_pressed = True
-
-                if event.key == pygame.K_LSHIFT:
-                    Ghost = True
-                    key_pressed = True
-
-                if event.key == pygame.K_SPACE:
-                    skip = True
-                    key_pressed = True
-
-
-            elif event.type == pygame.KEYUP:
-                # key_pressed = False
-                if event.key == pygame.K_w:
-                    W = False
-                if event.key == pygame.K_a:
-                    A = False
-                if event.key == pygame.K_s:
-                    S = False
-                if event.key == pygame.K_d:
-                    D = False
-                if event.key == pygame.K_j:
-                    CCW = False
-                if event.key == pygame.K_k:
-                    CW = False
-                if event.key == pygame.K_LSHIFT:
-                    Ghost = False
-                if event.key == pygame.K_SPACE:
-                    skip = False
-
-        pygame_draw(window, [tl_surface, tr_surface, ll_surface, lr_surface], obs)
-
-        if (key_pressed):
+        if keys[pg.K_LSHIFT]:
+            Ghost = True
+        key_pressed = W or A or S or D or CW or CCW or Ghost or skip
+        if (key_pressed or not paused):
+            env.render()
             act = generate_manual_action(W, A, S, D, CW, CCW, Ghost, skip, obs)
             # print(act)
             obs, rwd, done, info = env.step(act)
