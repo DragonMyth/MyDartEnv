@@ -12,7 +12,7 @@ except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
+class GooReshapingEnvManualControl(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -23,7 +23,7 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5,
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=7,
                                   disableViewer=False)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -167,7 +167,7 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
 
         if normalized:
             H = H ** (1.0 / 2)
-            # H = H / particles.shape[0]   
+            # H = H / particles.shape[0]
             H=H/10
 
         return H
@@ -297,22 +297,20 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
 
 
 if __name__ == '__main__':
-    env = PlasticSpringReshapingEnvManualControl()
+    env = GooReshapingEnvManualControl()
 
 
-    env.save_video = True
-    env.video_path = '/home/yzhang/manual_control_data'
-    import os
-
-    if not os.path.exists(env.video_path):
-        os.makedirs(env.video_path)
+    # env.save_video = True
+    # env.video_path = '/home/yzhang/sample_video'
+    # import os
+    #
+    # if not os.path.exists(env.video_path):
+    #     os.makedirs(env.video_path)
 
     obs = env.reset()
     cnt = 0
-    paused = True
 
     states = []
-    rwds = []
     while cnt < 1000:
 
         act = np.zeros((1, 5))
@@ -328,11 +326,6 @@ if __name__ == '__main__':
         Ghost = False
         skip = False
         keys = pg.key.get_pressed()
-
-        if keys[pg.K_r]:
-            paused = False
-        if keys[pg.K_p]:
-            paused = True
         if keys[pg.K_w]:
             W = True
         if keys[pg.K_a]:
@@ -354,25 +347,20 @@ if __name__ == '__main__':
         if keys[pg.K_LSHIFT]:
             Ghost = True
         key_pressed = W or A or S or D or CW or CCW or Ghost or skip
-        if (key_pressed or not paused):
+        if (key_pressed):
             env.render()
             act = generate_manual_action(W, A, S, D, CW, CCW, Ghost, skip, obs)
             # print(act)
             obs, rwd, done, info = env.step(act)
 
             state = env.get_full_state()
-            rwds.append(rwd.flatten())
             states.append(state[0,4::].flatten())
 
 
             cnt += 1
             if done:
                 break
-    states = np.array(states)
-    import matplotlib.pyplot as plt
-    x= np.arange(0,1000,1)
-    plt.plot(x,rwds)
-    plt.show()
+    # states = np.array(states)
     # np.savetxt("sample_data.csv",states,delimiter=",")
     # env = PlasticSpringReshapingEnvManualControl()
     #

@@ -64,7 +64,8 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
 
-        prev_distance = 0.1 * np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
+        # prev_distance = 0.1 * np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
+        prev_var = np.var(prev_state[:, 4::], axis=(1, 2))
 
         for i in range(action.shape[0]):
             targ_pos_trans = np.matmul(action[i, 0:2].transpose(), self.global_rot[i]).transpose()
@@ -78,12 +79,15 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
-        curr_distance = 0.1 * np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
+        curr_var = np.var(curr_state[:, 4::], axis=(1, 2))
+
+        # curr_distance = 0.1 * np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
 
         obs = self._get_obs()
 
-        rewards = (prev_distance - curr_distance)
+        # rewards = (prev_distance - curr_distance)
 
+        rewards = (prev_var-curr_var)
         info = {'Total Reward': rewards[0], }
 
         return obs, rewards, done, info
@@ -182,7 +186,7 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         return self._get_obs()
 
     def _render(self, mode='human', close=False):
-        if (self.disableViewer):
+        if (self.disableViewer or close):
             return
         else:
             if not self.screen:
