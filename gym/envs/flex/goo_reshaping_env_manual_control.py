@@ -5,13 +5,14 @@ from gym.utils import seeding
 import numpy as np
 from gym.envs.flex import flex_env
 import pygame as pg
+from gym.wrappers.monitoring import Monitor
 try:
     import bindings as pyFlex
 except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticSpringReshapingEnv(flex_env.FlexEnv):
+class GooReshapingEnvManualControl(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -22,7 +23,8 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=7,
+                                  disableViewer=False)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -32,7 +34,7 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
         # self.center_list = np.array([[0,1.5],[0,-1.5]])
-        self.center_list = np.array([[0,0]])
+        self.center_list = np.array([[0, 0]])
 
         # self.center_list = np.random.uniform(-2, 2, (100, 2))
 
@@ -46,7 +48,7 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
         # rand_rot_ang = np.ones(self.numInstances)
-        rand_rot_ang=0
+        rand_rot_ang = 0
 
         rand_rot_vec = np.ones((self.numInstances, 2, 2))
 
@@ -57,15 +59,14 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         return rand_rot_vec
 
     def _step(self, action):
-        action = action * self.action_scale
+        # action = action * self.action_scale
         prev_state = self.get_state()
         centers = self.center_list[self.circle_center]
 
         expanded_centers = np.expand_dims(centers, axis=1)
         expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
 
-        # prev_distance = 0.1 * np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
-        prev_var = np.var(prev_state[:, 4::], axis=(1, 2))
+        prev_distance = 0.1 * np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
 
         for i in range(action.shape[0]):
             targ_pos_trans = np.matmul(action[i, 0:2].transpose(), self.global_rot[i]).transpose()
@@ -79,19 +80,15 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
-        curr_var = np.var(curr_state[:, 4::], axis=(1, 2))
-
-        # curr_distance = 0.1 * np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
+        curr_distance = 0.1 * np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
 
         obs = self._get_obs()
 
-        # rewards = (prev_distance - curr_distance)
+        rewards = (prev_distance - curr_distance)
 
-        rewards = (prev_var-curr_var)
         info = {'Total Reward': rewards[0], }
 
         return obs, rewards, done, info
-
 
     def _get_obs(self):
 
@@ -113,12 +110,12 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
             bar_state[1] = bar_rot_trans
             bar_state[2] = bar_vel_trans
 
-            bar_density = self.get_voxel_bar_density(bar_state, self.global_rot[i])
+            bar_density = self.get_voxel_bar_density(bar_state)
             density = self.get_particle_density(part_state, self.global_rot[i], normalized=True)
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]], self.global_rot[i])
 
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(), bar_density.flatten()])
+                [bar_state.flatten(), density.flatten() , goal_gradient.flatten(), bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -134,7 +131,7 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         gradient = np.exp(-(((x - goal_rot[0]) ** 2 + (y - goal_rot[1]) ** 2) / (2.0 * sigma ** 2)))
         return gradient
 
-    def get_voxel_bar_density(self, bar_state, global_rot):
+    def get_voxel_bar_density(self, bar_state):
 
         center = bar_state[0]
         direction = bar_state[1].copy()
@@ -166,8 +163,11 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         H, xedges, yedges = np.histogram2d(y_pos, x_pos, bins=[self.resolution, self.resolution],
                                            range=[[-4, 4], [-4, 4]])
 
+        # H = np.clip(H,0,1000)
+
         if normalized:
             H = H ** (1.0 / 2)
+            # H = H / particles.shape[0]
             H=H/10
 
         return H
@@ -176,6 +176,8 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         full_state = flex_env.FlexEnv.get_state(self)
         return full_state[:, :, (0, 2)]
 
+    def get_full_state(self):
+        return flex_env.FlexEnv.get_state(self)
 
     def _reset(self):
         flex_env.FlexEnv._reset(self)
@@ -186,12 +188,9 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         return self._get_obs()
 
     def _render(self, mode='human', close=False):
-        if (self.disableViewer or close):
+        if (self.disableViewer):
             return
         else:
-            if not self.screen:
-                pg.init()
-                self.screen = pg.display.set_mode(self.screen_size, display=pg.OPENGL)
             width = self.screen_size[0]
             height = self.screen_size[1]
             gap = self.sub_screen_gap
@@ -215,7 +214,7 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         lr.fill([200, 200, 200])
 
         bar_map = obs[0, -self.resolution * self.resolution::]
-        goal_map = obs[0, 8 + self.resolution * self.resolution:8+2*(self.resolution * self.resolution)]
+        goal_map = obs[0, 8 + self.resolution * self.resolution:8 + 2 * (self.resolution * self.resolution)]
 
         part_map = obs[0, 8:8 + self.resolution * self.resolution]
 
@@ -251,19 +250,122 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
                                  pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
 
 
+def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
+    bar_state = obs[0, 0:4]
+
+    act = np.zeros((1, 5))
+
+    linear_scale = 5
+    ang_scale = np.pi / 6
+    linear_relative_target = np.zeros(2)
+    target_angle = 0
+    ghost_cont = 0
+    if w:
+        linear_relative_target += (np.array([0, -1]) * linear_scale)
+
+    if s:
+        linear_relative_target += (np.array([0, 1]) * linear_scale)
+
+    if a:
+        linear_relative_target += (np.array([-1, 0]) * linear_scale)
+    if d:
+        linear_relative_target += (np.array([1, 0]) * linear_scale)
+
+    if ghost:
+        ghost_cont = 1
+    if ccw:
+        target_angle = 1 * ang_scale
+    if cw:
+        target_angle = -1 * ang_scale
+    if not skip:
+        rot_vec = np.ones((2, 2))
+
+        rot_vec[0, 0] = np.cos(target_angle)
+        rot_vec[0, 1] = -np.sin(target_angle)
+        rot_vec[1, 0] = np.sin(target_angle)
+        rot_vec[1, 1] = np.cos(target_angle)
+
+        rot_vec = np.matmul(bar_state[2::].transpose(), rot_vec.transpose()).transpose()
+        act[0, 0:2] = bar_state[0:2] + linear_relative_target
+        act[0, 2:4] = rot_vec
+        act[0, 4] = ghost_cont
+    else:
+        act[0, 0:4] = bar_state
+        act[0, 4] = 0
+
+    return act
+
 
 if __name__ == '__main__':
-    env = PlasticSpringReshapingEnv()
+    env = GooReshapingEnvManualControl()
 
-    env.reset()
-    for _ in range(1000):
-        # print(pyFlex.get_state())
-        # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((16, 5))
-        act[:, -1] = 0
-        obs, rwd, done, info = env.step(act)
-        if done:
-            break
-    # else:
-    #     continue
-    # break
+
+    # env.save_video = True
+    # env.video_path = '/home/yzhang/sample_video'
+    # import os
+    #
+    # if not os.path.exists(env.video_path):
+    #     os.makedirs(env.video_path)
+
+    obs = env.reset()
+    cnt = 0
+
+    states = []
+    while cnt < 1000:
+
+        act = np.zeros((1, 5))
+
+        events = pg.event.get()
+
+        W = False
+        A = False
+        S = False
+        D = False
+        CW = False
+        CCW = False
+        Ghost = False
+        skip = False
+        keys = pg.key.get_pressed()
+        if keys[pg.K_w]:
+            W = True
+        if keys[pg.K_a]:
+            A = True
+        if keys[pg.K_s]:
+            S = True
+        if keys[pg.K_d]:
+            D = True
+
+        if keys[pg.K_j]:
+            CCW = True
+
+        if keys[pg.K_k]:
+            CW = True
+
+        if keys[pg.K_SPACE]:
+            skip = True
+
+        if keys[pg.K_LSHIFT]:
+            Ghost = True
+        key_pressed = W or A or S or D or CW or CCW or Ghost or skip
+        if (key_pressed):
+            env.render()
+            act = generate_manual_action(W, A, S, D, CW, CCW, Ghost, skip, obs)
+            # print(act)
+            obs, rwd, done, info = env.step(act)
+
+            state = env.get_full_state()
+            states.append(state[0,4::].flatten())
+
+
+            cnt += 1
+            if done:
+                break
+    # states = np.array(states)
+    # np.savetxt("sample_data.csv",states,delimiter=",")
+    # env = PlasticSpringReshapingEnvManualControl()
+    #
+    # obs = env.reset()
+    # for _ in range(1000):
+        # env.render()
+        # act = np.zeros((1, 5))
+        # obs, rwd, done, info = env.step(act)

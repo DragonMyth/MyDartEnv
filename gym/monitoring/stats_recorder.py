@@ -55,7 +55,7 @@ class StatsRecorder(object):
     def after_step(self, observation, reward, done, info):
         self.steps += 1
         self.total_steps += 1
-        if (type(reward) == tuple):
+        if (type(reward) != float):
             self.rewards += reward[0]
         else:
             self.rewards += reward

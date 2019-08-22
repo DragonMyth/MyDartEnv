@@ -176,6 +176,9 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
         full_state = flex_env.FlexEnv.get_state(self)
         return full_state[:, :, (0, 2)]
 
+    def get_full_state(self):
+        return flex_env.FlexEnv.get_state(self)
+
     def _reset(self):
         flex_env.FlexEnv._reset(self)
 
@@ -290,38 +293,27 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
         act[0, 0:4] = bar_state
         act[0, 4] = 0
 
-    # act = np.array([[0.52088761, -2.95443344, 1, 0, 0]])
-    # act = np.array([[1,0 ,1, 0, 0]])
-
-    # print(act)
     return act
 
 
 if __name__ == '__main__':
-    # import pygame
-    #
-    # pygame.init()
-    # gap = 4
-    # width = 400
-    # height = 400
-    # window = pygame.display.set_mode((width, height))
-    #
-    # tl_rect = pygame.Rect(0, 0, width / 2 - gap / 2, height / 2 - gap / 2)
-    # tr_rect = pygame.Rect(width / 2 + gap / 2, 0, width, height / 2 - gap / 2)
-    #
-    # ll_rect = pygame.Rect(0, height / 2 + gap / 2, width / 2 - gap / 2, height)
-    #
-    # lr_rect = pygame.Rect(0, 0, width / 2 + gap / 2, height / 2 + gap / 2)
-    #
-    # tl_surface = pygame.Surface((width / 2, height / 2))
-    # tr_surface = pygame.Surface((width / 2, height / 2))
-    # ll_surface = pygame.Surface((width / 2, height / 2))
-    # lr_surface = pygame.Surface((width / 2, height / 2))
-
     env = PlasticSpringReshapingEnvManualControl()
+
+
+    env.save_video = True
+    env.video_path = '/home/yzhang/manual_control_data'
+    import os
+
+    if not os.path.exists(env.video_path):
+        os.makedirs(env.video_path)
+
     obs = env.reset()
     cnt = 0
+
+    states = []
+    rwds = []
     while cnt < 1000:
+
         act = np.zeros((1, 5))
 
         events = pg.event.get()
@@ -362,11 +354,20 @@ if __name__ == '__main__':
             # print(act)
             obs, rwd, done, info = env.step(act)
 
+            state = env.get_full_state()
+            rwds.append(rwd.flatten())
+            states.append(state[0,4::].flatten())
+
 
             cnt += 1
             if done:
                 break
-
+    states = np.array(states)
+    import matplotlib.pyplot as plt
+    x= np.arange(0,1000,1)
+    plt.plot(x,rwds)
+    plt.show()
+    # np.savetxt("sample_data.csv",states,delimiter=",")
     # env = PlasticSpringReshapingEnvManualControl()
     #
     # obs = env.reset()
