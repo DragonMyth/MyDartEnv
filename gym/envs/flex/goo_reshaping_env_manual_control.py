@@ -30,7 +30,6 @@ class GooReshapingEnvManualControl(flex_env.FlexEnv):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
         # self.center_list = np.array([[0,1.5],[0,-1.5]])

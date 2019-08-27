@@ -15,7 +15,7 @@ except ImportError as e:
 class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
     def __init__(self):
 
-        self.resolution = 32
+        self.resolution = 11
         obs_size = self.resolution * self.resolution * 3 + 8
 
         self.frame_skip = 10
@@ -301,7 +301,7 @@ if __name__ == '__main__':
 
 
     env.save_video = True
-    env.video_path = '/home/yzhang/manual_control_data'
+    env.video_path = 'manual_control_data'
     import os
 
     if not os.path.exists(env.video_path):
