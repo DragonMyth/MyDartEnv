@@ -74,7 +74,7 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
             action[i, 0:2] = targ_pos_trans
             action[i, 2:4] = targ_rot_trans
 
-        action = np.concatenate([action, centers], axis=1)
+        action = np.concatenate([action, centers,centers], axis=1)
 
         done = self.do_simulation(action, self.frame_skip)
 
@@ -129,7 +129,7 @@ class PlasticSpringReshapingEnv(flex_env.FlexEnv):
         goal_rot = np.matmul(goal.transpose(), global_rot.transpose()).transpose()
 
         x, y = np.meshgrid(np.linspace(-4, 4, self.resolution), np.linspace(-4, 4, self.resolution))
-        sigma = 0.7
+        sigma = 0.5
 
         gradient = np.exp(-(((x - goal_rot[0]) ** 2 + (y - goal_rot[1]) ** 2) / (2.0 * sigma ** 2)))
         return gradient

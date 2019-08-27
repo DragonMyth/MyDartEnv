@@ -5,14 +5,14 @@ from gym.utils import seeding
 import numpy as np
 from gym.envs.flex import flex_env
 import pygame as pg
-from gym.wrappers.monitoring import Monitor
+
 try:
     import bindings as pyFlex
 except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
+class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -23,8 +23,7 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5,
-                                  disableViewer=False)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5,disableViewer=False)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -33,17 +32,20 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
 
         # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
 
-        # self.center_list = np.array([[0,1.5],[0,-1.5]])
-        self.center_list = np.array([[0, 0]])
+        self.center_list = np.array([[0, 2], [0, -2]])
+        # self.center_list = np.array([[0,0]])
 
         # self.center_list = np.random.uniform(-2, 2, (100, 2))
 
-        self.randGoalRange = self.center_list.shape[0] - 1
+        self.randGoalRange = self.center_list.shape[0]
 
-        self.circle_center = np.random.random_integers(0, self.randGoalRange, self.numInstances)
+        self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
+                                     (self.numInstances, 1))
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
         self.global_rot = self.generate_rand_rot_vec()
+        self.partIdxGoal1 = None
+        self.partIdxGoal2 = None
 
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -63,10 +65,24 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
         prev_state = self.get_state()
         centers = self.center_list[self.circle_center]
 
-        expanded_centers = np.expand_dims(centers, axis=1)
-        expanded_centers = np.repeat(expanded_centers, prev_state.shape[1], axis=1)
+        group1_center = centers[:, 0]
+        group2_center = centers[:, 1]
 
-        prev_distance = 0.1 * np.sum(np.linalg.norm(prev_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
+        expanded_group1_centers = np.expand_dims(group1_center, axis=1)
+        expanded_group1_centers = np.repeat(expanded_group1_centers, prev_state.shape[1], axis=1)
+
+        expanded_group2_centers = np.expand_dims(group2_center, axis=1)
+        expanded_group2_centers = np.repeat(expanded_group2_centers, prev_state.shape[1], axis=1)
+
+        prev_distances_center_1 = np.linalg.norm(prev_state - expanded_group1_centers, axis=2)[:, 4::]
+        prev_distances_center_2 = np.linalg.norm(prev_state - expanded_group2_centers, axis=2)[:, 4::]
+
+        prev_distances_center_1 = np.partition(prev_distances_center_1, int(prev_distances_center_1.shape[1]/2), axis=1)[:,:int(prev_distances_center_1.shape[1]/2)]
+        prev_distances_center_1 = np.sum(prev_distances_center_1,axis=1)
+
+        prev_distances_center_2 = np.partition(prev_distances_center_2, int(prev_distances_center_2.shape[1]/2), axis=1)[:,:int(prev_distances_center_2.shape[1]/2)]
+        prev_distances_center_2 = np.sum(prev_distances_center_2,axis=1)
+
 
         for i in range(action.shape[0]):
             targ_pos_trans = np.matmul(action[i, 0:2].transpose(), self.global_rot[i]).transpose()
@@ -75,19 +91,25 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
             action[i, 0:2] = targ_pos_trans
             action[i, 2:4] = targ_rot_trans
 
-        action = np.concatenate([action, centers], axis=1)
+        action = np.concatenate([action,  group1_center,group2_center], axis=1)
 
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
-        curr_distance = 0.1 * np.sum(np.linalg.norm(curr_state - expanded_centers, axis=2)[:, 4::] ** 3, axis=1)
 
+        curr_distances_center_1 = np.linalg.norm(curr_state - expanded_group1_centers, axis=2)[:, 4::]
+        curr_distances_center_2 = np.linalg.norm(curr_state - expanded_group2_centers, axis=2)[:, 4::]
+
+        curr_distances_center_1 = np.partition(curr_distances_center_1, int(curr_distances_center_1.shape[1]/2), axis=1)[:,:int(curr_distances_center_1.shape[1]/2)]
+        curr_distances_center_1 = np.sum(curr_distances_center_1,axis=1)
+
+        curr_distances_center_2 = np.partition(curr_distances_center_2, int(curr_distances_center_2.shape[1]/2), axis=1)[:,:int(curr_distances_center_2.shape[1]/2)]
+        curr_distances_center_2 = np.sum(curr_distances_center_2, axis=1)
         obs = self._get_obs()
 
-        rewards = (prev_distance - curr_distance)
+        rewards = -(curr_distances_center_1 + curr_distances_center_2)
 
-        info = {'Total Reward': rewards[0], }
-
+        info = {'Total Reward': rewards[0],'Goal1 Reward': -curr_distances_center_1[0],'Goal2 Reward': -curr_distances_center_2[0], }
         return obs, rewards, done, info
 
     def _get_obs(self):
@@ -110,12 +132,13 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
             bar_state[1] = bar_rot_trans
             bar_state[2] = bar_vel_trans
 
-            bar_density = self.get_voxel_bar_density(bar_state)
+            bar_density = self.get_voxel_bar_density(bar_state, self.global_rot[i])
             density = self.get_particle_density(part_state, self.global_rot[i], normalized=True)
+
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]], self.global_rot[i])
 
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten() , goal_gradient.flatten(), bar_density.flatten()])
+                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(), bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -123,15 +146,16 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
 
     def get_goal_gradient(self, goal, global_rot):
 
-        goal_rot = np.matmul(goal.transpose(), global_rot.transpose()).transpose()
-
         x, y = np.meshgrid(np.linspace(-4, 4, self.resolution), np.linspace(-4, 4, self.resolution))
-        sigma = 0.7
+        sigma = 0.3
+        gradient = np.zeros(x.shape)
+        for i in range(goal.shape[0]):
+            goal_rot = np.matmul(goal[i].transpose(), global_rot.transpose()).transpose()
+            gradient += np.exp(-(((x - goal_rot[0]) ** 2 + (y - goal_rot[1]) ** 2) / (2.0 * sigma ** 2)))
 
-        gradient = np.exp(-(((x - goal_rot[0]) ** 2 + (y - goal_rot[1]) ** 2) / (2.0 * sigma ** 2)))
         return gradient
 
-    def get_voxel_bar_density(self, bar_state):
+    def get_voxel_bar_density(self, bar_state, global_rot):
 
         center = bar_state[0]
         direction = bar_state[1].copy()
@@ -163,12 +187,9 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
         H, xedges, yedges = np.histogram2d(y_pos, x_pos, bins=[self.resolution, self.resolution],
                                            range=[[-4, 4], [-4, 4]])
 
-        # H = np.clip(H,0,1000)
-
         if normalized:
             H = H ** (1.0 / 2)
-            # H = H / particles.shape[0]
-            H=H/10
+            H = H / 20
 
         return H
 
@@ -183,24 +204,33 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
         flex_env.FlexEnv._reset(self)
 
         self.global_rot = self.generate_rand_rot_vec()
-        self.circle_center = np.random.random_integers(0, self.randGoalRange, self.numInstances)
+        self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
+                                     (self.numInstances, 1))
+
+        states = self.get_state()
+        self.partIdxGoal1 = states[:, 4::, 1] > 0
+        self.partIdxGoal2 = states[:, 4::, 1] <= 0
 
         return self._get_obs()
 
     def _render(self, mode='human', close=False):
-        if (self.disableViewer):
+        if (self.disableViewer or close):
             return
         else:
+            if not self.screen:
+                pg.init()
+                self.screen = pg.display.set_mode(self.screen_size, display=pg.OPENGL)
             width = self.screen_size[0]
             height = self.screen_size[1]
             gap = self.sub_screen_gap
 
-            tl_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
-            tr_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
-            ll_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
-            lr_surface = pg.Surface((width / 2-gap/2, height / 2-gap/2))
+            tl_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
+            tr_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
+            ll_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
+            lr_surface = pg.Surface((width / 2 - gap / 2, height / 2 - gap / 2))
             self.pygame_draw([tl_surface, tr_surface, ll_surface, lr_surface])
             return flex_env.FlexEnv._render(self)
+
     def pygame_draw(self, surfaces):
         obs = self._get_obs()
         tl = surfaces[0]
@@ -232,7 +262,8 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
         self.screen.blit(ll, (0, self.screen.get_height() / 2 + self.sub_screen_gap / 2))
 
         self.screen.blit(lr, (
-        self.screen.get_width() / 2 + self.sub_screen_gap / 2, self.screen.get_height() / 2 + self.sub_screen_gap / 2))
+            self.screen.get_width() / 2 + self.sub_screen_gap / 2,
+            self.screen.get_height() / 2 + self.sub_screen_gap / 2))
 
     def draw_grid(self, surface, data, min, scale):
         data = (data - min) / scale
@@ -247,16 +278,15 @@ class PlasticSpringReshapingEnvManualControl(flex_env.FlexEnv):
 
                 final_color = 255 * (np.array([1, 0, 0]) * color + np.array([0, 0, 1]) * (1 - color))
                 pg.draw.rect(surface, final_color,
-                                 pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
-
+                             pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
 
 def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
     bar_state = obs[0, 0:4]
 
     act = np.zeros((1, 5))
 
-    linear_scale = 5
-    ang_scale = np.pi / 6
+    linear_scale = 2
+    ang_scale = 0.1 * np.pi
     linear_relative_target = np.zeros(2)
     target_angle = 0
     ghost_cont = 0
@@ -293,12 +323,15 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
         act[0, 0:4] = bar_state
         act[0, 4] = 0
 
+    # act = np.array([[0.52088761, -2.95443344, 1, 0, 0]])
+    # act = np.array([[1,0 ,1, 0, 0]])
+
+    # print(act)
     return act
 
 
 if __name__ == '__main__':
-    env = PlasticSpringReshapingEnvManualControl()
-
+    env = PlasticSpringMultiGoalKNNRWDEnv()
 
     env.save_video = True
     env.video_path = '/home/yzhang/manual_control_data'
@@ -311,8 +344,8 @@ if __name__ == '__main__':
     cnt = 0
 
     states = []
-    rwds = []
-    while cnt < 1000:
+    all_info = []
+    while cnt < 500:
 
         act = np.zeros((1, 5))
 
@@ -355,23 +388,47 @@ if __name__ == '__main__':
             obs, rwd, done, info = env.step(act)
 
             state = env.get_full_state()
-            rwds.append(rwd.flatten())
-            states.append(state[0,4::].flatten())
-
+            all_info.append(info)
+            states.append(state[0, 4::].flatten())
 
             cnt += 1
             if done:
                 break
+
     states = np.array(states)
-    import matplotlib.pyplot as plt
-    x= np.arange(0,1000,1)
-    plt.plot(x,rwds)
-    plt.show()
+    import matplotlib.pyplot as plot
+
+    iters = np.arange(1, len(all_info) + 1, 1)
+    data_list = {}
+    for i in range(len(all_info)):
+
+        for key in all_info[0]:
+            if key not in data_list:
+                data_list[key] = []
+            data_list[key].append(all_info[i][key])
+
+
+    # total_ret = np.sum(data_list['rwd'])
+    # print("Total return of the trajectory is: ", total_ret)
+
+    # sns.set_palette('hls', len(data_list))
+    for key in sorted(data_list.keys()):
+        # print(key)
+        if (key != 'actions' and key != 'states'):
+            cnt += 1
+            plot.plot(iters, data_list[key],
+                      label=str(key))
+            plot.yscale('symlog')
+
+    plot.xlabel('Time Steps')
+    plot.ylabel('Step Reward')
+    plot.legend()
+    plot.show()
     # np.savetxt("sample_data.csv",states,delimiter=",")
     # env = PlasticSpringReshapingEnvManualControl()
     #
     # obs = env.reset()
     # for _ in range(1000):
-        # env.render()
-        # act = np.zeros((1, 5))
-        # obs, rwd, done, info = env.step(act)
+    # env.render()
+    # act = np.zeros((1, 5))
+    # obs, rwd, done, info = env.step(act)

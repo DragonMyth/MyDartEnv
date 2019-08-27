@@ -624,7 +624,7 @@ register(
 
 register(
     id='FlexPlasticReshaping-v0',
-    entry_point='gym.envs.flex:PlasticReshapingEnv',
+    entry_point='gym.envs.flex:PlasticTestEnv',
     max_episode_steps=1000,
 )
 
@@ -634,6 +634,24 @@ register(
     max_episode_steps=1000,
 )
 
+register(
+    id='FlexPlasticReshaping-v2',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalReshapingEnv',
+    max_episode_steps=1000,
+)
+
+register(
+    id='FlexPlasticReshaping-v3',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalKNNRWDEnv',
+    max_episode_steps=1000,
+)
+#
+#
+# register(
+#     id='FlexPlasticReshaping-v3',
+#     entry_point='gym.envs.flex:PlasticSpringMultiGoalKNNRWDEnv',
+#     max_episode_steps=1000,
+# )
 
 # Atari
 # ----------------------------------------

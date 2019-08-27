@@ -21,7 +21,7 @@ class FlexEnv(gym.Env):
 
         self.disableViewer = disableViewer
         self.screen = None
-        self.screen_size = (400,400)
+        self.screen_size = (800,800)
         self.sub_screen_gap = 4
         if not self.disableViewer:
             pg.init()
