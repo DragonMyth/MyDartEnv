@@ -342,6 +342,7 @@ if __name__ == '__main__':
 
     obs = env.reset()
     cnt = 0
+    paused = True
 
     states = []
     all_info = []
@@ -360,6 +361,11 @@ if __name__ == '__main__':
         Ghost = False
         skip = False
         keys = pg.key.get_pressed()
+
+        if keys[pg.K_r]:
+            paused = False
+        if keys[pg.K_p]:
+            paused = True
         if keys[pg.K_w]:
             W = True
         if keys[pg.K_a]:
@@ -381,7 +387,7 @@ if __name__ == '__main__':
         if keys[pg.K_LSHIFT]:
             Ghost = True
         key_pressed = W or A or S or D or CW or CCW or Ghost or skip
-        if (key_pressed):
+        if (key_pressed or not paused):
             env.render()
             act = generate_manual_action(W, A, S, D, CW, CCW, Ghost, skip, obs)
             # print(act)

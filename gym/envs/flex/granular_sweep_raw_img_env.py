@@ -34,7 +34,7 @@ class GranularSweepRawImgEnv(flex_env.FlexEnv):
         # self.center_list = np.array([[0,1.5],[0,-1.5]])
         self.center_list = np.array([[0,0]])
 
-        # self.center_list = np.random.uniform(-2, 2, (100, 2))
+        self.center_list = np.random.uniform(-2, 2, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]-1
 
@@ -207,8 +207,8 @@ if __name__ == '__main__':
     for _ in range(1000):
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((25, 4))
-
+        act = np.zeros((25, 5))
+        # act[:,-1]=1
         obs, rwd, done, info = env.step(act)
         if done:
             break
