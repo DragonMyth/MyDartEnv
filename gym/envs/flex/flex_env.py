@@ -19,6 +19,7 @@ class FlexEnv(gym.Env):
         assert obs_type in ('parameter', 'image')
         assert action_type in ("continuous", "discrete")
 
+
         self.disableViewer = disableViewer
         self.screen = None
         self.screen_size = (800,800)
@@ -27,6 +28,7 @@ class FlexEnv(gym.Env):
             pg.init()
             self.screen = pg.display.set_mode(self.screen_size,display=pg.OPENGL)
 
+        pyFlex.setVisualize(not disableViewer)
         pyFlex.chooseScene(scene)
         pyFlex.initialize()
 

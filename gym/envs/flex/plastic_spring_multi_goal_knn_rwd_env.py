@@ -23,7 +23,7 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=9)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -77,12 +77,16 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
         prev_distances_center_1 = np.linalg.norm(prev_state - expanded_group1_centers, axis=2)[:, 4::]
         prev_distances_center_2 = np.linalg.norm(prev_state - expanded_group2_centers, axis=2)[:, 4::]
 
-        prev_distances_center_1 = np.partition(prev_distances_center_1, int(prev_distances_center_1.shape[1]/2), axis=1)[:,:int(prev_distances_center_1.shape[1]/2)]
-        prev_distances_center_1 = np.sum(prev_distances_center_1,axis=1)
+        argpartitioned = np.argpartition(prev_distances_center_1, int(prev_distances_center_1.shape[1] / 2), axis=1)
+        prev_distances_center_1 = prev_distances_center_1[np.arange(prev_distances_center_1.shape[0])[:, None], argpartitioned[:, :int(
+            prev_distances_center_1.shape[1] / 2)]]
+        prev_distances_center_1 = np.sum(prev_distances_center_1, axis=1)
 
-        prev_distances_center_2 = np.partition(prev_distances_center_2, int(prev_distances_center_2.shape[1]/2), axis=1)[:,:int(prev_distances_center_2.shape[1]/2)]
-        prev_distances_center_2 = np.sum(prev_distances_center_2,axis=1)
+        prev_distances_center_2 = prev_distances_center_2[
+            np.arange(prev_distances_center_2.shape[0])[:, None], argpartitioned[:,
+                                                                  int(prev_distances_center_2.shape[1] / 2)::]]
 
+        prev_distances_center_2 = np.sum(prev_distances_center_2, axis=1)
 
         for i in range(action.shape[0]):
             targ_pos_trans = np.matmul(action[i, 0:2].transpose(), self.global_rot[i]).transpose()
@@ -91,7 +95,7 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
             action[i, 0:2] = targ_pos_trans
             action[i, 2:4] = targ_rot_trans
 
-        action = np.concatenate([action,  group1_center,group2_center], axis=1)
+        action = np.concatenate([action, group1_center, group2_center], axis=1)
 
         done = self.do_simulation(action, self.frame_skip)
 
@@ -100,14 +104,19 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
         curr_distances_center_1 = np.linalg.norm(curr_state - expanded_group1_centers, axis=2)[:, 4::]
         curr_distances_center_2 = np.linalg.norm(curr_state - expanded_group2_centers, axis=2)[:, 4::]
 
-        curr_distances_center_1 = np.partition(curr_distances_center_1, int(curr_distances_center_1.shape[1]/2), axis=1)[:,:int(curr_distances_center_1.shape[1]/2)]
-        curr_distances_center_1 = np.sum(curr_distances_center_1,axis=1)
+        argpartitioned = np.argpartition(curr_distances_center_1, int(curr_distances_center_1.shape[1] / 2), axis=1)
 
-        curr_distances_center_2 = np.partition(curr_distances_center_2, int(curr_distances_center_2.shape[1]/2), axis=1)[:,:int(curr_distances_center_2.shape[1]/2)]
+        curr_distances_center_1 = curr_distances_center_1[np.arange(curr_distances_center_1.shape[0])[:, None], argpartitioned[:, :int(
+            curr_distances_center_1.shape[1] / 2)]]
+        curr_distances_center_1 = np.sum(curr_distances_center_1, axis=1)
+
+        curr_distances_center_2 = curr_distances_center_2[np.arange(curr_distances_center_2.shape[0])[:, None], argpartitioned[:, :int(
+            curr_distances_center_2.shape[1] / 2)]]
         curr_distances_center_2 = np.sum(curr_distances_center_2, axis=1)
         obs = self._get_obs()
 
-        rewards = (prev_distances_center_1+prev_distances_center_2)-(curr_distances_center_1 + curr_distances_center_2)
+        rewards = (prev_distances_center_1 + prev_distances_center_2) - (
+                curr_distances_center_1 + curr_distances_center_2)
 
         info = {'Total Reward': np.mean(rewards)}
         return obs, rewards, done, info
@@ -189,7 +198,7 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
 
         if normalized:
             H = H ** (1.0 / 2)
-            H = H / 5
+            H = H / 20
 
         return H
 
@@ -280,6 +289,7 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
                 pg.draw.rect(surface, final_color,
                              pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
 
+
 def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
     bar_state = obs[0, 0:4]
 
@@ -328,6 +338,7 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
 
     # print(act)
     return act
+
 
 if __name__ == '__main__':
     env = PlasticSpringMultiGoalKNNRWDEnv()

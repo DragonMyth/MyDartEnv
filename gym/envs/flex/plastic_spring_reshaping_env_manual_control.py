@@ -12,11 +12,11 @@ except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
+class PlasticSpringMultiGoalReshapingEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        obs_size = self.resolution * self.resolution * 3 + 8
+        obs_size = self.resolution * self.resolution * 4 + 8
 
         self.frame_skip = 10
         action_bound = np.array([[-4, -4, -1, -1, -1], [4, 4, 1, 1, 1]])
@@ -30,9 +30,9 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
 
-        # self.center_list = np.array([[1.5,1.5],[-1.5,-1.5],[-1.5,1.5],[1.5,-1.5]])
+        # self.center_list = np.array([[0, 2.5], [0, -2.5]])
 
-        self.center_list = np.array([[0, 2], [0, -2]])
+        self.center_list = np.array([[0, 0], [0, 0]])
         # self.center_list = np.array([[0,0]])
 
         # self.center_list = np.random.uniform(-2, 2, (100, 2))
@@ -61,28 +61,38 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
         return rand_rot_vec
 
     def _step(self, action):
-        # action = action * self.action_scale
-        prev_state = self.get_state()
+        action = action * self.action_scale
         centers = self.center_list[self.circle_center]
 
         group1_center = centers[:, 0]
         group2_center = centers[:, 1]
 
+        prev_state = self.get_state()
+        prev_group1_parts = prev_state[:, 4::][self.partIdxGoal1]
+        prev_group1_parts = np.reshape(prev_group1_parts, (
+            self.numInstances, int(prev_group1_parts.shape[0] / self.numInstances), prev_group1_parts.shape[1]))
+
+        prev_group2_parts = prev_state[:, 4::][self.partIdxGoal2]
+        prev_group2_parts = np.reshape(prev_group2_parts, (
+            self.numInstances, int(prev_group2_parts.shape[0] / self.numInstances), prev_group2_parts.shape[1]))
+
         expanded_group1_centers = np.expand_dims(group1_center, axis=1)
-        expanded_group1_centers = np.repeat(expanded_group1_centers, prev_state.shape[1], axis=1)
+        expanded_group1_centers = np.repeat(expanded_group1_centers, prev_group1_parts.shape[1], axis=1)
 
         expanded_group2_centers = np.expand_dims(group2_center, axis=1)
-        expanded_group2_centers = np.repeat(expanded_group2_centers, prev_state.shape[1], axis=1)
+        expanded_group2_centers = np.repeat(expanded_group2_centers, prev_group2_parts.shape[1], axis=1)
 
-        prev_distances_center_1 = np.linalg.norm(prev_state - expanded_group1_centers, axis=2)[:, 4::]
-        prev_distances_center_2 = np.linalg.norm(prev_state - expanded_group2_centers, axis=2)[:, 4::]
+        prev_distance_group1 = np.sum(np.linalg.norm(prev_group1_parts - expanded_group1_centers, axis=2), axis=1)
+        prev_distance_group2 = np.sum(np.linalg.norm(prev_group2_parts - expanded_group2_centers, axis=2), axis=1)
 
-        prev_distances_center_1 = np.partition(prev_distances_center_1, int(prev_distances_center_1.shape[1]/2), axis=1)[:,:int(prev_distances_center_1.shape[1]/2)]
-        prev_distances_center_1 = np.sum(prev_distances_center_1,axis=1)
+        prev_var_group1 = np.var(prev_group1_parts, axis=(1, 2))
+        prev_var_group2 = np.var(prev_group2_parts, axis=(1, 2))
 
-        prev_distances_center_2 = np.partition(prev_distances_center_2, int(prev_distances_center_2.shape[1]/2), axis=1)[:,:int(prev_distances_center_2.shape[1]/2)]
-        prev_distances_center_2 = np.sum(prev_distances_center_2,axis=1)
+        prev_mean_group1 = np.mean(prev_group1_parts, axis=(1))
+        prev_mean_group2 = np.mean(prev_group2_parts, axis=(1))
 
+        # prev_distance_group1 = np.linalg.norm(prev_mean_group1 - centers[:, 0], axis=1)
+        # prev_distance_group2 = np.linalg.norm(prev_mean_group2 - centers[:, 1], axis=1)
 
         for i in range(action.shape[0]):
             targ_pos_trans = np.matmul(action[i, 0:2].transpose(), self.global_rot[i]).transpose()
@@ -91,25 +101,43 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
             action[i, 0:2] = targ_pos_trans
             action[i, 2:4] = targ_rot_trans
 
-        action = np.concatenate([action,  group1_center,group2_center], axis=1)
+        action = np.concatenate([action, group1_center, group2_center], axis=1)
 
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
 
-        curr_distances_center_1 = np.linalg.norm(curr_state - expanded_group1_centers, axis=2)[:, 4::]
-        curr_distances_center_2 = np.linalg.norm(curr_state - expanded_group2_centers, axis=2)[:, 4::]
+        curr_group1_parts = curr_state[:, 4::][self.partIdxGoal1]
+        curr_group1_parts = np.reshape(curr_group1_parts, (
+            self.numInstances, int(curr_group1_parts.shape[0] / self.numInstances), curr_group1_parts.shape[1]))
 
-        curr_distances_center_1 = np.partition(curr_distances_center_1, int(curr_distances_center_1.shape[1]/2), axis=1)[:,:int(curr_distances_center_1.shape[1]/2)]
-        curr_distances_center_1 = np.sum(curr_distances_center_1,axis=1)
+        curr_group2_parts = curr_state[:, 4::][self.partIdxGoal2]
+        curr_group2_parts = np.reshape(curr_group2_parts, (
+            self.numInstances, int(curr_group2_parts.shape[0] / self.numInstances), curr_group2_parts.shape[1]))
 
-        curr_distances_center_2 = np.partition(curr_distances_center_2, int(curr_distances_center_2.shape[1]/2), axis=1)[:,:int(curr_distances_center_2.shape[1]/2)]
-        curr_distances_center_2 = np.sum(curr_distances_center_2, axis=1)
+        curr_distance_group1 = np.sum(np.linalg.norm(curr_group1_parts - expanded_group1_centers, axis=2), axis=1)
+        curr_distance_group2 = np.sum(np.linalg.norm(curr_group2_parts - expanded_group2_centers, axis=2), axis=1)
+
+        curr_var_group1 = np.var(curr_group1_parts, axis=(1, 2))
+        curr_var_group2 = np.var(curr_group2_parts, axis=(1, 2))
+
+        curr_mean_group1 = np.mean(curr_group1_parts, axis=(1))
+        curr_mean_group2 = np.mean(curr_group2_parts, axis=(1))
+
+        # curr_distance_group1 = np.linalg.norm(curr_mean_group1 - centers[:, 0], axis=1)
+        # curr_distance_group2 = np.linalg.norm(curr_mean_group2 - centers[:, 1], axis=1)
         obs = self._get_obs()
 
-        rewards = -(curr_distances_center_1 + curr_distances_center_2)
+        group1_rwd_distannce = 0.01 * (prev_distance_group1 - curr_distance_group1)
+        group2_rwd_distannce = 0.01 * (prev_distance_group2 - curr_distance_group2)
+        group1_rwd_var = (prev_var_group1 - curr_var_group1)
+        group2_rwd_var = (prev_var_group2 - curr_var_group2)
 
-        info = {'Total Reward': rewards[0],'Goal1 Reward': -curr_distances_center_1[0],'Goal2 Reward': -curr_distances_center_2[0], }
+        rewards = group1_rwd_distannce + group2_rwd_distannce + group1_rwd_var + group2_rwd_var
+
+        info = {'Total Reward': np.mean(rewards), "Distance 1": np.mean(group1_rwd_distannce),
+                "Var 1": np.mean(group1_rwd_var), "Distance 2": np.mean(group2_rwd_distannce),
+                "Var 2": np.mean(group2_rwd_var)}
         return obs, rewards, done, info
 
     def _get_obs(self):
@@ -120,6 +148,9 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
         for i in range(self.numInstances):
             state = states[i]
             part_state = state[4::]
+
+            part_state_group1 = part_state[self.partIdxGoal1[i]]
+            part_state_group2 = part_state[self.partIdxGoal2[i]]
 
             bar_state = state[:4]
 
@@ -133,12 +164,14 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
             bar_state[2] = bar_vel_trans
 
             bar_density = self.get_voxel_bar_density(bar_state, self.global_rot[i])
-            density = self.get_particle_density(part_state, self.global_rot[i], normalized=True)
+            density_group1 = self.get_particle_density(part_state_group1, self.global_rot[i], normalized=True)
+            density_group2 = self.get_particle_density(part_state_group2, self.global_rot[i], normalized=True)
 
             goal_gradient = self.get_goal_gradient(self.center_list[self.circle_center[i]], self.global_rot[i])
 
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(), bar_density.flatten()])
+                [bar_state.flatten(), density_group1.flatten(), density_group2.flatten(), goal_gradient.flatten(),
+                 bar_density.flatten()])
 
             obs_list.append(obs)
 
@@ -189,16 +222,13 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
 
         if normalized:
             H = H ** (1.0 / 2)
-            H = H / 20
+            H = H / 10
 
         return H
 
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
         return full_state[:, :, (0, 2)]
-
-    def get_full_state(self):
-        return flex_env.FlexEnv.get_state(self)
 
     def _reset(self):
         flex_env.FlexEnv._reset(self)
@@ -243,19 +273,21 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
 
-        bar_map = obs[0, -self.resolution * self.resolution::]
-        goal_map = obs[0, 8 + self.resolution * self.resolution:8 + 2 * (self.resolution * self.resolution)]
-
-        part_map = obs[0, 8:8 + self.resolution * self.resolution]
+        part_map_1 = obs[0, 8:8 + self.resolution * self.resolution]
+        part_map_2 = obs[0, 8 + self.resolution * self.resolution:8 + 2 * self.resolution * self.resolution]
+        goal_map = obs[0, 8 + 2 * self.resolution * self.resolution:8 + 3 * (self.resolution * self.resolution)]
+        bar_map = obs[0, 8 + 3 * self.resolution * self.resolution:8 + 4 * (self.resolution * self.resolution)]
 
         bar_map = np.reshape(bar_map, (self.resolution, self.resolution)).astype(np.float64)
         goal_map = np.reshape(goal_map, (self.resolution, self.resolution)).astype(np.float64)
-        part_map = np.reshape(part_map, (self.resolution, self.resolution)).astype(np.float64)
+        part_map_1 = np.reshape(part_map_1, (self.resolution, self.resolution)).astype(np.float64)
+        part_map_2 = np.reshape(part_map_2, (self.resolution, self.resolution)).astype(np.float64)
 
         self.draw_grid(tl, bar_map, 0, 1)
         self.draw_grid(tr, goal_map, 0, 1)
 
-        self.draw_grid(lr, part_map, 0, 1)
+        self.draw_grid(lr, part_map_1, 0, 1)
+        self.draw_grid(ll, part_map_2, 0, 1)
 
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() / 2 + self.sub_screen_gap / 2, 0))
@@ -279,6 +311,7 @@ class PlasticSpringMultiGoalKNNRWDEnv(flex_env.FlexEnv):
                 final_color = 255 * (np.array([1, 0, 0]) * color + np.array([0, 0, 1]) * (1 - color))
                 pg.draw.rect(surface, final_color,
                              pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
+
 
 def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
     bar_state = obs[0, 0:4]
@@ -331,21 +364,21 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
 
 
 if __name__ == '__main__':
-    env = PlasticSpringMultiGoalKNNRWDEnv()
+    env = PlasticSpringMultiGoalReshapingEnv()
 
-    env.save_video = True
-    env.video_path = '/home/yzhang/manual_control_data'
-    import os
-
-    if not os.path.exists(env.video_path):
-        os.makedirs(env.video_path)
+    # env.save_video = True
+    # env.video_path = '/home/yzhang/manual_control_data'
+    # import os
+    #
+    # if not os.path.exists(env.video_path):
+    #     os.makedirs(env.video_path)
 
     obs = env.reset()
     cnt = 0
     paused = True
 
-    states = []
     all_info = []
+    ret = 0
     while cnt < 500:
 
         act = np.zeros((1, 5))
@@ -391,17 +424,18 @@ if __name__ == '__main__':
             env.render()
             act = generate_manual_action(W, A, S, D, CW, CCW, Ghost, skip, obs)
             # print(act)
+            act /= env.action_scale
             obs, rwd, done, info = env.step(act)
-
-            state = env.get_full_state()
+            ret+=rwd[0]
             all_info.append(info)
-            states.append(state[0, 4::].flatten())
+            # state = env.get_full_state()
+            #
+            # states.append(state[0, 4::].flatten())
 
             cnt += 1
             if done:
                 break
 
-    states = np.array(states)
     import matplotlib.pyplot as plot
 
     iters = np.arange(1, len(all_info) + 1, 1)
@@ -412,7 +446,6 @@ if __name__ == '__main__':
             if key not in data_list:
                 data_list[key] = []
             data_list[key].append(all_info[i][key])
-
 
     # total_ret = np.sum(data_list['rwd'])
     # print("Total return of the trajectory is: ", total_ret)
@@ -430,6 +463,7 @@ if __name__ == '__main__':
     plot.ylabel('Step Reward')
     plot.legend()
     plot.show()
+    print("Total Return: ",ret)
     # np.savetxt("sample_data.csv",states,delimiter=",")
     # env = PlasticSpringReshapingEnvManualControl()
     #
