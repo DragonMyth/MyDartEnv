@@ -23,7 +23,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5,disableViewer=False)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4,disableViewer=True)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -320,162 +320,22 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
                              pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
 
 
-def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
-    bar_state = obs[0, 0:4]
-
-    act = np.zeros((1, 5))
-
-    linear_scale = 2
-    ang_scale = 0.1 * np.pi
-    linear_relative_target = np.zeros(2)
-    target_angle = 0
-    ghost_cont = 0
-    if w:
-        linear_relative_target += (np.array([0, -1]) * linear_scale)
-
-    if s:
-        linear_relative_target += (np.array([0, 1]) * linear_scale)
-
-    if a:
-        linear_relative_target += (np.array([-1, 0]) * linear_scale)
-    if d:
-        linear_relative_target += (np.array([1, 0]) * linear_scale)
-
-    if ghost:
-        ghost_cont = 1
-    if ccw:
-        target_angle = 1 * ang_scale
-    if cw:
-        target_angle = -1 * ang_scale
-    if not skip:
-        rot_vec = np.ones((2, 2))
-
-        rot_vec[0, 0] = np.cos(target_angle)
-        rot_vec[0, 1] = -np.sin(target_angle)
-        rot_vec[1, 0] = np.sin(target_angle)
-        rot_vec[1, 1] = np.cos(target_angle)
-
-        rot_vec = np.matmul(bar_state[2::].transpose(), rot_vec.transpose()).transpose()
-        act[0, 0:2] = bar_state[0:2] + linear_relative_target
-        act[0, 2:4] = rot_vec
-        act[0, 4] = ghost_cont
-    else:
-        act[0, 0:4] = bar_state
-        act[0, 4] = 0
-
-    # act = np.array([[0.52088761, -2.95443344, 1, 0, 0]])
-    # act = np.array([[1,0 ,1, 0, 0]])
-
-    # print(act)
-    return act
-
-
 if __name__ == '__main__':
     env = PlasticSpringMultiGoalReshapingSolidEnv()
 
-    # env.save_video = True
-    # env.video_path = '/home/yzhang/manual_control_data'
-    # import os
-    #
-    # if not os.path.exists(env.video_path):
-    #     os.makedirs(env.video_path)
+    env.reset()
+    for i in range(2000):
+        # env.render()
+        # print(pyFlex.get_state())
+        # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
+        act = np.zeros((16, 4))
+        act[:, -1] = 0
+        obs, rwd, done, info = env.step(act)
 
-    obs = env.reset()
-    cnt = 0
-    paused = True
-
-    all_info = []
-    ret = 0
-    while cnt < 500:
-
-        act = np.zeros((1, 5))
-
-        events = pg.event.get()
-
-        W = False
-        A = False
-        S = False
-        D = False
-        CW = False
-        CCW = False
-        Ghost = False
-        skip = False
-        keys = pg.key.get_pressed()
-
-        if keys[pg.K_r]:
-            paused = False
-        if keys[pg.K_p]:
-            paused = True
-        if keys[pg.K_w]:
-            W = True
-        if keys[pg.K_a]:
-            A = True
-        if keys[pg.K_s]:
-            S = True
-        if keys[pg.K_d]:
-            D = True
-
-        if keys[pg.K_j]:
-            CCW = True
-
-        if keys[pg.K_k]:
-            CW = True
-
-        if keys[pg.K_SPACE]:
-            skip = True
-
-        if keys[pg.K_LSHIFT]:
-            Ghost = True
-        key_pressed = W or A or S or D or CW or CCW or Ghost or skip
-        if (key_pressed or not paused):
-            env.render()
-            act = generate_manual_action(W, A, S, D, CW, CCW, Ghost, skip, obs)
-            # print(act)
-            act = act[:,0:4]/env.action_scale
-            obs, rwd, done, info = env.step(act)
-            ret+=rwd[0]
-            all_info.append(info)
-            # state = env.get_full_state()
-            #
-            # states.append(state[0, 4::].flatten())
-
-            cnt += 1
-            if done:
-                break
-
-    import matplotlib.pyplot as plot
-
-    iters = np.arange(1, len(all_info) + 1, 1)
-    data_list = {}
-    for i in range(len(all_info)):
-
-        for key in all_info[0]:
-            if key not in data_list:
-                data_list[key] = []
-            data_list[key].append(all_info[i][key])
-
-    # total_ret = np.sum(data_list['rwd'])
-    # print("Total return of the trajectory is: ", total_ret)
-
-    # sns.set_palette('hls', len(data_list))
-    for key in sorted(data_list.keys()):
-        # print(key)
-        if (key != 'actions' and key != 'states'):
-            cnt += 1
-            plot.plot(iters, data_list[key],
-                      label=str(key))
-            plot.yscale('symlog')
-
-    plot.xlabel('Time Steps')
-    plot.ylabel('Step Reward')
-    plot.legend()
-    plot.show()
-    print("Total Return: ",ret)
-    # np.savetxt("sample_data.csv",states,delimiter=",")
-    # env = PlasticSpringReshapingEnvManualControl()
-    #
-    # obs = env.reset()
-    # for _ in range(1000):
-    # env.render()
-    # act = np.zeros((1, 5))
-    # obs, rwd, done, info = env.step(act)
+        if i % 100 == 0:
+            print(i)
+        if done:
+            break
+    # else:
+    #     continue
+    # break

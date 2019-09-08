@@ -23,14 +23,14 @@ class PlasticSpringMultiGoalReshapingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4,disableViewer=True)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4,disableViewer=False)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
 
-        self.center_list = np.array([[0, 2.5], [0, -2.5]])
+        self.center_list = np.array([[0, 2], [0, -2]])
         # self.center_list = np.array([[1.5, 1.5], [-1.5, -1.5]])
 
         # self.center_list = np.array([[0,0]])
@@ -90,7 +90,7 @@ class PlasticSpringMultiGoalReshapingEnv(flex_env.FlexEnv):
 
         prev_mean_group1 = np.mean(prev_group1_parts, axis=(1))
         prev_mean_group2 = np.mean(prev_group2_parts, axis=(1))
-        prev_mean_dist = np.clip(np.linalg.norm((prev_mean_group1-prev_mean_group2),axis=1),0,5)
+        prev_mean_dist = np.clip(np.linalg.norm((prev_mean_group1-prev_mean_group2),axis=1),0,4)
 
         # prev_distance_group1 = np.linalg.norm(prev_mean_group1 - centers[:, 0], axis=1)
         # prev_distance_group2 = np.linalg.norm(prev_mean_group2 - centers[:, 1], axis=1)
@@ -125,19 +125,21 @@ class PlasticSpringMultiGoalReshapingEnv(flex_env.FlexEnv):
         curr_mean_group1 = np.mean(curr_group1_parts, axis=(1))
         curr_mean_group2 = np.mean(curr_group2_parts, axis=(1))
 
-        curr_mean_dist = np.clip(np.linalg.norm((curr_mean_group1-curr_mean_group2),axis=1),0,5)
+        curr_mean_dist = np.clip(np.linalg.norm((curr_mean_group1-curr_mean_group2),axis=1),0,4)
         # curr_distance_group1 = np.linalg.norm(curr_mean_group1 - centers[:, 0], axis=1)
         # curr_distance_group2 = np.linalg.norm(curr_mean_group2 - centers[:, 1], axis=1)
         obs = self._get_obs()
 
-        group1_rwd_distannce = 0.00*curr_mean_dist*(prev_distance_group1 - curr_distance_group1)
-        group2_rwd_distannce = 0.00*curr_mean_dist*(prev_distance_group2 - curr_distance_group2)
+        group1_rwd_distannce = 0.01 * (prev_distance_group1 - curr_distance_group1)
+        group2_rwd_distannce = 0.01 * (prev_distance_group2 - curr_distance_group2)
 
-        group1_rwd_var = 10*curr_mean_dist*(prev_var_group1 - curr_var_group1)
-        group2_rwd_var = 10*curr_mean_dist*(prev_var_group2 - curr_var_group2)
+        # if(curr_mean_dist>=3):
+        group1_rwd_var = 0 * ((prev_var_group1 - curr_var_group1))
+        group2_rwd_var = 0 * ((prev_var_group2 - curr_var_group2))
 
-        separation_rwd = (curr_mean_dist-prev_mean_dist)
-        rewards = group1_rwd_distannce + group2_rwd_distannce + group1_rwd_var + group2_rwd_var+separation_rwd
+        separation_rwd = (curr_mean_dist - prev_mean_dist)
+
+        rewards = group1_rwd_distannce + group2_rwd_distannce + group1_rwd_var + group2_rwd_var + separation_rwd
 
         info = {'Total Reward': np.mean(rewards), "Distance 1": np.mean(group1_rwd_distannce),
                 "Var 1": np.mean(group1_rwd_var),"Distance 2": np.mean(group2_rwd_distannce),
@@ -226,7 +228,7 @@ class PlasticSpringMultiGoalReshapingEnv(flex_env.FlexEnv):
 
         if normalized:
             H = H ** (1.0 / 2)
-            H = H / 20
+            H = H / 15
 
         return H
 

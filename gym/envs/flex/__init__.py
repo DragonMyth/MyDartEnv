@@ -12,4 +12,5 @@ from gym.envs.flex.plastic_reshaping_env import PlasticReshapingEnv
 from gym.envs.flex.plastic_spring_reshaping_env import  PlasticSpringReshapingEnv
 from gym.envs.flex.plastic_spring_multi_goal_env import PlasticSpringMultiGoalReshapingEnv
 from gym.envs.flex.plastic_spring_multi_goal_knn_rwd_env import PlasticSpringMultiGoalKNNRWDEnv
+from gym.envs.flex.plastic_spring_multi_goal_solid_env import PlasticSpringMultiGoalReshapingSolidEnv
 from gym.envs.flex.plastic_test_env import PlasticTestEnv
