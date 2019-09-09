@@ -29,6 +29,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
+        self.barDim = np.array([1.5,1,0.01])
 
         self.center_list = np.array([[0, 2], [0, -2]])
         # self.center_list = np.array([[1.5, 1.5], [-1.5, -1.5]])
@@ -103,7 +104,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
             action[i, 2:4] = targ_rot_trans
 
         solid = np.zeros((self.numInstances,1))
-        action = np.concatenate([action, solid,group1_center, group2_center], axis=1)
+        action = np.concatenate([action, solid], axis=1)
 
         done = self.do_simulation(action, self.frame_skip)
 
@@ -241,8 +242,26 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         flex_env.FlexEnv._reset(self)
 
         self.global_rot = self.generate_rand_rot_vec()
+
         self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
                                      (self.numInstances, 1))
+
+        goals= self.center_list.flatten()
+        self.set_goal(np.tile(goals,(self.numInstances,1)))
+
+
+        pos = np.random.uniform(-3,3,(self.numInstances,2))
+        rot = np.random.uniform(-np.pi,np.pi,(self.numInstances,1))
+
+        # pos = np.random.uniform(-0.0,0.0,(self.numInstances,2))
+        # rot = np.random.uniform(-0.1*np.pi,0.1*np.pi,(self.numInstances,1))
+
+        vel = np.zeros((self.numInstances,2))
+        angVel = np.zeros((self.numInstances,1))
+        barDim = np.tile(self.barDim,(self.numInstances,1))
+
+        controllers = np.concatenate([pos,rot,vel,angVel,barDim],axis=1)
+        self.set_controller(controllers)
 
         states = self.get_state()
         self.partIdxGoal1 = states[:, 4::, 1] > 0

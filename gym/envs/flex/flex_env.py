@@ -104,7 +104,11 @@ class FlexEnv(gym.Env):
         # return full_state
         full_state = state_vec.reshape([self.numInstances,int(state_vec.shape[0]/self.numInstances),3])
         return full_state
+    def set_controller(self,controllerConfig):
+        pyFlex.setController(controllerConfig)
 
+    def set_goal(self,goals):
+        pyFlex.setGoal(goals)
     def _render(self, mode='human', close=False):
         if(self.disableViewer):
             return
