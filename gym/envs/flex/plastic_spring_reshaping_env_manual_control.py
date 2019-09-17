@@ -12,7 +12,7 @@ except ImportError as e:
     raise error.DependencyNotInstalled("{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
+class PlasticTestEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -29,6 +29,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
+        self.barDim = np.array([1.5,1,0.01])
 
         self.center_list = np.array([[0, 2], [0, -2]])
         # self.center_list = np.array([[1.5, 1.5], [-1.5, -1.5]])
@@ -82,8 +83,8 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         expanded_group2_centers = np.expand_dims(group2_center, axis=1)
         expanded_group2_centers = np.repeat(expanded_group2_centers, prev_group2_parts.shape[1], axis=1)
 
-        prev_distance_group1 = np.sum(np.linalg.norm(prev_group1_parts - expanded_group1_centers, axis=2), axis=1)
-        prev_distance_group2 = np.sum(np.linalg.norm(prev_group2_parts - expanded_group2_centers, axis=2), axis=1)
+        prev_distance_group1 = np.sum(np.linalg.norm(prev_group1_parts - expanded_group1_centers, axis=2)**0.5, axis=1)
+        prev_distance_group2 = np.sum(np.linalg.norm(prev_group2_parts - expanded_group2_centers, axis=2)**0.5, axis=1)
 
         prev_var_group1 = np.var(prev_group1_parts, axis=(1, 2))
         prev_var_group2 = np.var(prev_group2_parts, axis=(1, 2))
@@ -103,7 +104,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
             action[i, 2:4] = targ_rot_trans
 
         solid = np.zeros((self.numInstances,1))
-        action = np.concatenate([action, solid,group1_center, group2_center], axis=1)
+        action = np.concatenate([action, solid], axis=1)
 
         done = self.do_simulation(action, self.frame_skip)
 
@@ -117,8 +118,8 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         curr_group2_parts = np.reshape(curr_group2_parts, (
             self.numInstances, int(curr_group2_parts.shape[0] / self.numInstances), curr_group2_parts.shape[1]))
 
-        curr_distance_group1 = np.sum(np.linalg.norm(curr_group1_parts - expanded_group1_centers, axis=2), axis=1)
-        curr_distance_group2 = np.sum(np.linalg.norm(curr_group2_parts - expanded_group2_centers, axis=2), axis=1)
+        curr_distance_group1 = np.sum(np.linalg.norm(curr_group1_parts - expanded_group1_centers, axis=2)**0.5, axis=1)
+        curr_distance_group2 = np.sum(np.linalg.norm(curr_group2_parts - expanded_group2_centers, axis=2)**0.5, axis=1)
 
         curr_var_group1 = np.var(curr_group1_parts, axis=(1, 2))
         curr_var_group2 = np.var(curr_group2_parts, axis=(1, 2))
@@ -131,8 +132,8 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         # curr_distance_group2 = np.linalg.norm(curr_mean_group2 - centers[:, 1], axis=1)
         obs = self._get_obs()
 
-        group1_rwd_distannce = 0.01*(prev_distance_group1 - curr_distance_group1)
-        group2_rwd_distannce = 0.01*(prev_distance_group2 - curr_distance_group2)
+        group1_rwd_distannce = 0.5*(prev_distance_group1 - curr_distance_group1)
+        group2_rwd_distannce = 0.5*(prev_distance_group2 - curr_distance_group2)
 
         # if(curr_mean_dist>=3):
         group1_rwd_var =0*((prev_var_group1 - curr_var_group1))
@@ -204,7 +205,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         end_point_1 = center + direction * 1.5
         end_point_2 = center - direction * 1.5
 
-        step = 1.0 / 40
+        step = 1.0 / 100
         interp = np.arange(0, 1 + step, step)
         interp = np.expand_dims(interp, axis=1)
         interp = np.repeat(interp, 2, axis=1)
@@ -214,23 +215,47 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
 
         H, xedges, yedges = np.histogram2d(interp_y, interp_x, bins=[self.resolution, self.resolution],
                                            range=[[-4, 4], [-4, 4]])
-        H = (H > 0).astype(int)
 
+        # H = (H > 0).astype(int)
+
+        # for i in range(-1,2,1):
+        #     for j in range(-1,2,1):
+        #         if i!=j:
+        #             pert_x = i*8/self.resolution
+        #             pert_y = j*8/self.resolution
+        #             H_shift, xedges_shift, yedges_shift = np.histogram2d(interp_y, interp_x, bins=[self.resolution, self.resolution],
+        #                                                range=[[-4+pert_x, 4+pert_x], [-4+pert_y, 4+pert_y]])
+        #             H+=H_shift
+        # H/=20
+        H = self.get_density(interp,self.resolution)/70
+        H = np.clip(H,0,1)
         return H
 
     def get_particle_density(self, particles, global_rot, normalized=True):
 
         particles_rot = np.matmul(particles, global_rot.transpose())
+
+        H = self.get_density(particles_rot,self.resolution)
         x_pos = particles_rot[:, 0]
         y_pos = particles_rot[:, 1]
 
-        H, xedges, yedges = np.histogram2d(y_pos, x_pos, bins=[self.resolution, self.resolution],
+        H2, xedges, yedges = np.histogram2d(y_pos, x_pos, bins=[self.resolution, self.resolution],
                                            range=[[-4, 4], [-4, 4]])
 
+        # print((H==H2).all())
+        # for i in range(-1,2,1):
+        #     for j in range(-1,2,1):
+        #         if i!=j:
+        #             pert_x = i*8/self.resolution
+        #             pert_y = j*8/self.resolution
+        #             H_shift, xedges_shift, yedges_shift = np.histogram2d(y_pos, x_pos, bins=[self.resolution, self.resolution],
+        #                                                range=[[-4+pert_x, 4+pert_x], [-4+pert_y, 4+pert_y]])
+        #             H+=H_shift
+        # H/=9.0
         if normalized:
-            H = H ** (1.0 / 2)
-            H = H / 15
-
+            # H = H ** (1.0 / 2)
+            H = H / 70
+            H = np.clip(H,0,1)
         return H
 
     def get_state(self):
@@ -241,8 +266,26 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         flex_env.FlexEnv._reset(self)
 
         self.global_rot = self.generate_rand_rot_vec()
+
         self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
                                      (self.numInstances, 1))
+
+        goals= self.center_list.flatten()
+        self.set_goal(np.tile(goals,(self.numInstances,1)))
+
+
+        # pos = np.random.uniform(-3,3,(self.numInstances,2))
+        # rot = np.random.uniform(-np.pi,np.pi,(self.numInstances,1))
+
+        pos = np.random.uniform(-0.0,0.0,(self.numInstances,2))
+        rot = np.random.uniform(-0*np.pi,0*np.pi,(self.numInstances,1))
+
+        vel = np.zeros((self.numInstances,2))
+        angVel = np.zeros((self.numInstances,1))
+        barDim = np.tile(self.barDim,(self.numInstances,1))
+
+        controllers = np.concatenate([pos,rot,vel,angVel,barDim],axis=1)
+        self.set_controller(controllers)
 
         states = self.get_state()
         self.partIdxGoal1 = states[:, 4::, 1] > 0
@@ -371,7 +414,7 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
 
 
 if __name__ == '__main__':
-    env = PlasticSpringMultiGoalReshapingSolidEnv()
+    env = PlasticTestEnv()
 
     # env.save_video = True
     # env.video_path = '/home/yzhang/manual_control_data'

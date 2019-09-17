@@ -109,6 +109,10 @@ class FlexEnv(gym.Env):
 
     def set_goal(self,goals):
         pyFlex.setGoal(goals)
+
+    def get_density(self,particles,resolution):
+        return pyFlex.getParticleDensity(particles, resolution)
+
     def _render(self, mode='human', close=False):
         if(self.disableViewer):
             return
@@ -116,6 +120,7 @@ class FlexEnv(gym.Env):
             pg.display.update()
             img = pg.surfarray.array3d(self.screen).transpose([1,0,2])
             return img
+
 if __name__ == '__main__':
     env = FlexEnv(frame_skip=5, observation_size=10, action_bounds=np.array([[-3, -3, -1, -1], [3, 3, 1, 1]]),scene=0)
 
