@@ -642,7 +642,7 @@ register(
 
 register(
     id='FlexPlasticReshaping-v3',
-    entry_point='gym.envs.flex:PlasticSpringMultiGoalKNNRWDEnv',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalKnnReshapingEnv',
     max_episode_steps=1000,
 )
 

@@ -110,8 +110,8 @@ class FlexEnv(gym.Env):
     def set_goal(self,goals):
         pyFlex.setGoal(goals)
 
-    def get_density(self,particles,resolution):
-        return pyFlex.getParticleDensity(particles, resolution)
+    def get_density(self,particles,resolution,width):
+        return pyFlex.getParticleDensity(particles, resolution,width)
 
     def _render(self, mode='human', close=False):
         if(self.disableViewer):

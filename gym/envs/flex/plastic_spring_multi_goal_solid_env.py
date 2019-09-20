@@ -23,7 +23,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4,disableViewer=True)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4,disableViewer=False)
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -218,7 +218,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
 
 
         # H/=20
-        H = self.get_density(interp,self.resolution)/70
+        H = self.get_density(interp,self.resolution,2)/70
         H= np.clip(H,0,1)
         return H
 
@@ -226,7 +226,7 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
 
         particles_rot = np.matmul(particles, global_rot.transpose())
 
-        H = self.get_density(particles_rot,self.resolution)
+        H = self.get_density(particles_rot,self.resolution,2)
         x_pos = particles_rot[:, 0]
         y_pos = particles_rot[:, 1]
 
