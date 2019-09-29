@@ -6,6 +6,11 @@ import numpy as np
 from gym.envs.flex import flex_env
 import pygame as pg
 
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+from OpenGL.GLU import *
+
 try:
     import bindings as pyFlex
 except ImportError as e:
@@ -15,21 +20,24 @@ except ImportError as e:
 class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
     def __init__(self):
 
+
         self.resolution = 32
         obs_size = self.resolution * self.resolution * 3 + 8
 
         self.frame_skip = 10
-        action_bound = np.array([[-4, -4, -1, -1,-1], [4, 4, 1, 1, 1]])
+        action_bound = np.array([[-4, -4, -1, -1, -1], [4, 4, 1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5,disableViewer=False)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5,
+                                  disableViewer=False)
+
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([1.5,1,0.01])
+        self.barDim = np.array([1.5, 1, 0.01])
 
         self.center_list = np.array([[0, 2], [0, -2]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
@@ -63,7 +71,7 @@ class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
         action = action * self.action_scale
         prev_state = self.get_state()
         centers = self.center_list[self.circle_center]
-
+        half_part_cnt = int(prev_state[:, 4::].shape[1] / 2)
         group1_center = centers[:, 0]
         group2_center = centers[:, 1]
 
@@ -76,21 +84,12 @@ class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
         prev_distances_center_1 = np.linalg.norm(prev_state - expanded_group1_centers, axis=2)[:, 4::]
         prev_distances_center_2 = np.linalg.norm(prev_state - expanded_group2_centers, axis=2)[:, 4::]
 
-        # argpartitioned = np.argpartition(prev_distances_center_1, int(prev_distances_center_1.shape[1] / 2), axis=1)
-        partition_group1 = np.partition(prev_distances_center_1, int(prev_distances_center_1.shape[1] / 2), axis=1)
-        # prev_distances_center_1 = prev_distances_center_1[
-        #     np.arange(prev_distances_center_1.shape[0])[:, None], argpartitioned[:, :int(
-        #         prev_distances_center_1.shape[1] / 2)]]
-        # prev_distances_center_1 = np.sum(prev_distances_center_1, axis=1)
-        prev_distances_center_1 = np.sum(partition_group1, axis=1)
+        partition_group1 = np.partition(prev_distances_center_1, half_part_cnt, axis=1)[:, :half_part_cnt]
 
-        partition_group2 = np.partition(prev_distances_center_2, int(prev_distances_center_2.shape[1] / 2), axis=1)
-        prev_distances_center_2 = np.sum(partition_group2, axis=1)
-        # prev_distances_center_2 = prev_distances_center_2[
-        #     np.arange(prev_distances_center_2.shape[0])[:, None], argpartitioned[:,
-        #                                                           int(prev_distances_center_2.shape[1] / 2)::]]
-        #
-        # prev_distances_center_2 = np.sum(prev_distances_center_2, axis=1)
+        prev_distances_center_1 = np.sum(partition_group1 ** 0.5, axis=1)
+
+        partition_group2 = np.partition(prev_distances_center_2, half_part_cnt, axis=1)[:, :half_part_cnt]
+        prev_distances_center_2 = np.sum(partition_group2 ** 0.5, axis=1)
 
         for i in range(action.shape[0]):
             targ_pos_trans = np.matmul(action[i, 0:2].transpose(), self.global_rot[i]).transpose()
@@ -106,33 +105,35 @@ class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
         curr_distances_center_1 = np.linalg.norm(curr_state - expanded_group1_centers, axis=2)[:, 4::]
         curr_distances_center_2 = np.linalg.norm(curr_state - expanded_group2_centers, axis=2)[:, 4::]
 
-        # argpartitioned = np.argpartition(curr_distances_center_1, int(curr_distances_center_1.shape[1] / 2), axis=1)
-        #
-        # curr_distances_center_1 = curr_distances_center_1[
-        #     np.arange(curr_distances_center_1.shape[0])[:, None], argpartitioned[:, :int(
-        #         curr_distances_center_1.shape[1] / 2)]]
-        # curr_distances_center_1 = np.sum(curr_distances_center_1, axis=1)
-        #
-        # curr_distances_center_2 = curr_distances_center_2[
-        #     np.arange(curr_distances_center_2.shape[0])[:, None], argpartitioned[:, :int(
-        #         curr_distances_center_2.shape[1] / 2)]]
-        # curr_distances_center_2 = np.sum(curr_distances_center_2, axis=1)
+        partition_group1 = np.partition(curr_distances_center_1, half_part_cnt, axis=1)[:, :half_part_cnt]
 
-        partition_group1 = np.partition(curr_distances_center_1, int(curr_distances_center_1.shape[1] / 2), axis=1)
-        # prev_distances_center_1 = prev_distances_center_1[
-        #     np.arange(prev_distances_center_1.shape[0])[:, None], argpartitioned[:, :int(
-        #         prev_distances_center_1.shape[1] / 2)]]
-        # prev_distances_center_1 = np.sum(prev_distances_center_1, axis=1)
-        curr_distances_center_1 = np.sum(partition_group1, axis=1)
+        curr_distances_center_1 = np.sum(partition_group1 ** 0.5, axis=1)
 
-        partition_group2 = np.partition(curr_distances_center_2, int(curr_distances_center_2.shape[1] / 2), axis=1)
-        curr_distances_center_2 = np.sum(partition_group2, axis=1)
+        partition_group2 = np.partition(curr_distances_center_2, half_part_cnt, axis=1)[:, :half_part_cnt]
+        curr_distances_center_2 = np.sum(partition_group2 ** 0.5, axis=1)
+
+        goal_1_valid_idx = np.where(partition_group1 < 1)
+        goal_1_cnt = np.bincount(goal_1_valid_idx[0], minlength=self.numInstances)
+
+        goal_2_valid_idx = np.where(partition_group2 < 1)
+        goal_2_cnt = np.bincount(goal_2_valid_idx[0], minlength=self.numInstances)
+
+        # print(num_outliers)
         obs = self._get_obs()
-
-        rewards = (prev_distances_center_1 + prev_distances_center_2) - (
-                curr_distances_center_1 + curr_distances_center_2)
+        goal_1_attract_rwd = prev_distances_center_1 - curr_distances_center_1
+        goal_2_attract_rwd = prev_distances_center_2 - curr_distances_center_2
+        part_movement_rwd = 0.1*np.mean(np.linalg.norm((curr_state - prev_state)[:, 4::], axis=1), axis=1)
+        num_outliers = -0.005*((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
+        print(num_outliers)
+        rewards = goal_1_attract_rwd+goal_2_attract_rwd+part_movement_rwd+num_outliers
         # print(rewards)
-        info = {'Total Reward': np.mean(rewards),"Group 1":np.mean(prev_distances_center_1-curr_distances_center_1),"Group 2":np.mean(prev_distances_center_2-curr_distances_center_2) }
+        info = {'Total Reward': np.mean(rewards),
+                'Goal 1 Attract' : np.mean(goal_1_attract_rwd),
+                'Goal 2 Attract' :np.mean(goal_2_attract_rwd),
+                'Particle_Movement': np.mean(part_movement_rwd),
+                'Num Outliers rwd': np.mean(num_outliers),
+
+                }
         return obs, rewards, done, info
 
     def _get_obs(self):
@@ -196,30 +197,21 @@ class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
         interp_x = interp[:, 0]
         interp_y = interp[:, 1]
 
-        H, xedges, yedges = np.histogram2d(interp_y, interp_x, bins=[self.resolution, self.resolution],
-                                           range=[[-4, 4], [-4, 4]])
-
-
-        # H/=20
-        H = self.get_density(interp,self.resolution,1.5)/50
-        H= np.clip(H,0,1)
+        H = self.get_density(interp, self.resolution, 1.5) / 50
+        H = np.clip(H, 0, 1)
         return H
 
     def get_particle_density(self, particles, global_rot, normalized=True):
 
         particles_rot = np.matmul(particles, global_rot.transpose())
 
-        H = self.get_density(particles_rot,self.resolution,2.5)
+        H = self.get_density(particles_rot, self.resolution, 2.5)
         x_pos = particles_rot[:, 0]
         y_pos = particles_rot[:, 1]
-
-        H2, xedges, yedges = np.histogram2d(y_pos, x_pos, bins=[self.resolution, self.resolution],
-                                           range=[[-4, 4], [-4, 4]])
-
         if normalized:
             # H = H ** (1.0 / 2)
-            H = H/150
-            H = np.clip(H,0,1)
+            H = H / 150
+            H = np.clip(H, 0, 1)
         return H
 
     def get_state(self):
@@ -234,21 +226,20 @@ class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
         self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
                                      (self.numInstances, 1))
 
-        goals= self.center_list.flatten()
-        self.set_goal(np.tile(goals,(self.numInstances,1)))
+        goals = self.center_list.flatten()
+        self.set_goal(np.tile(goals, (self.numInstances, 1)))
 
+        pos = np.random.uniform(-3, 3, (self.numInstances, 2))
+        rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 1))
 
-        # pos = np.random.uniform(-3,3,(self.numInstances,2))
-        # rot = np.random.uniform(-np.pi,np.pi,(self.numInstances,1))
+        # pos = np.random.uniform(-0.0,0.0,(self.numInstances,2))
+        # rot = np.random.uniform(-0.1*np.pi,0.1*np.pi,(self.numInstances,1))
 
-        pos = np.random.uniform(-0.0,0.0,(self.numInstances,2))
-        rot = np.random.uniform(-0.1*np.pi,0.1*np.pi,(self.numInstances,1))
+        vel = np.zeros((self.numInstances, 2))
+        angVel = np.zeros((self.numInstances, 1))
+        barDim = np.tile(self.barDim, (self.numInstances, 1))
 
-        vel = np.zeros((self.numInstances,2))
-        angVel = np.zeros((self.numInstances,1))
-        barDim = np.tile(self.barDim,(self.numInstances,1))
-
-        controllers = np.concatenate([pos,rot,vel,angVel,barDim],axis=1)
+        controllers = np.concatenate([pos, rot, vel, angVel, barDim], axis=1)
         self.set_controller(controllers)
 
         return self._get_obs()
@@ -259,7 +250,7 @@ class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
         else:
             if not self.screen:
                 pg.init()
-                self.screen = pg.display.set_mode(self.screen_size, display=pg.OPENGL)
+                self.screen = pg.display.set_mode(self.screen_size)
             width = self.screen_size[0]
             height = self.screen_size[1]
             gap = self.sub_screen_gap
@@ -284,7 +275,7 @@ class PlasticSpringMultiGoalKnnReshapingManualEnv(flex_env.FlexEnv):
         lr.fill([200, 200, 200])
 
         part_map = obs[0, 8:8 + self.resolution * self.resolution]
-        goal_map = obs[0, 8 +  self.resolution * self.resolution:8 + 2 * (self.resolution * self.resolution)]
+        goal_map = obs[0, 8 + self.resolution * self.resolution:8 + 2 * (self.resolution * self.resolution)]
         bar_map = obs[0, 8 + 2 * self.resolution * self.resolution:8 + 3 * (self.resolution * self.resolution)]
 
         bar_map = np.reshape(bar_map, (self.resolution, self.resolution)).astype(np.float64)
@@ -373,6 +364,10 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
 if __name__ == '__main__':
     env = PlasticSpringMultiGoalKnnReshapingManualEnv()
 
+    # for i in range(1000):
+    #     glRotatef(1,0,1,0)
+    #     display()
+
     # env.save_video = True
     # env.video_path = '/home/yzhang/manual_control_data'
     # import os
@@ -438,8 +433,8 @@ if __name__ == '__main__':
             # state = env.get_full_state()
             #
             # states.append(state[0, 4::].flatten())
-
             cnt += 1
+
             if done:
                 break
 

@@ -7,6 +7,10 @@ from os import path
 import gym
 import six
 import pygame as pg
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
 try:
     import bindings as pyFlex
 except ImportError as e:
@@ -15,7 +19,7 @@ except ImportError as e:
 
 class FlexEnv(gym.Env):
     def __init__(self, frame_skip, observation_size, observation_bounds,action_bounds,
-                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0, disableViewer = True):
+                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0, disableViewerFlex = False,disableViewer = True):
         assert obs_type in ('parameter', 'image')
         assert action_type in ("continuous", "discrete")
 
@@ -26,9 +30,12 @@ class FlexEnv(gym.Env):
         self.sub_screen_gap = 4
         if not self.disableViewer:
             pg.init()
-            self.screen = pg.display.set_mode(self.screen_size,display=pg.OPENGL)
+            self.screen = pg.display.set_mode(self.screen_size)
+            # gluPerspective(45, (self.screen_size[0] / self.screen_size[1]), 0.1, 50.0)
 
-        pyFlex.setVisualize(not disableViewer)
+
+
+        pyFlex.setVisualize(not disableViewerFlex)
         pyFlex.chooseScene(scene)
         pyFlex.initialize()
 
@@ -71,13 +78,16 @@ class FlexEnv(gym.Env):
 
         done = False
         save = self.save_video
-        for _ in range(n_frames):
-            path = os.path.join(self.video_path, 'frame_%d.tga' % self.step_cnt)
-            pyFlex.update_frame(save,path,tau.flatten())
-            save = False
-            done=pyFlex.sdl_main()
-            if done:
-                break
+        path = os.path.join(self.video_path, 'frame_%d.tga' % self.step_cnt)
+
+        pyFlex.simulateKSteps(save,path,tau.flatten(),n_frames)
+        # for _ in range(n_frames):
+        #     path = os.path.join(self.video_path, 'frame_%d.tga' % self.step_cnt)
+        #     pyFlex.update_frame(save,path,tau.flatten())
+        #     save = False
+        #     done=pyFlex.sdl_main()
+        #     if done:
+        #         break
 
         return done
     def _step(self, action):
@@ -117,6 +127,7 @@ class FlexEnv(gym.Env):
         if(self.disableViewer):
             return
         else:
+            # pg.display.flip()
             pg.display.update()
             img = pg.surfarray.array3d(self.screen).transpose([1,0,2])
             return img

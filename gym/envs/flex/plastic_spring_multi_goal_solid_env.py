@@ -31,8 +31,8 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([1.5,1,0.01])
 
-        # self.center_list = np.array([[0, 2], [0, -2]])
-        self.center_list = np.array([[2, -2], [-2, 2]])
+        self.center_list = np.array([[0, 2], [0, -2]])
+        # self.center_list = np.array([[2, -2], [-2, 2]])
 
         # self.center_list = np.array([[0,0]])
 
@@ -40,9 +40,11 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
 
         self.randGoalRange = self.center_list.shape[0]
 
-        self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
-                                     (self.numInstances, 1))
+        # self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
+        #                              (self.numInstances, 1))
 
+        self.circle_center = np.tile(np.array([0,1]),
+                                     (self.numInstances, 1))
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
         self.global_rot = self.generate_rand_rot_vec()
         self.partIdxGoal1 = None
@@ -248,9 +250,10 @@ class PlasticSpringMultiGoalReshapingSolidEnv(flex_env.FlexEnv):
 
         self.global_rot = self.generate_rand_rot_vec()
 
-        self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
+        # self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
+        #                              (self.numInstances, 1))
+        self.circle_center = np.tile(np.array([0,1]),
                                      (self.numInstances, 1))
-
         goals= self.center_list.flatten()
         self.set_goal(np.tile(goals,(self.numInstances,1)))
 
