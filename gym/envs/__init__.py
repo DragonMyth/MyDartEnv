@@ -652,6 +652,13 @@ register(
     max_episode_steps=1000,
 )
 
+register(
+    id='FlexPlasticReshaping-v5',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalBarCenteredEnv',
+    max_episode_steps=1000,
+)
+
+
 #
 #
 # register(

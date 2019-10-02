@@ -42,10 +42,10 @@ class PlasticTestEnv(flex_env.FlexEnv):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        # self.barDim = np.array([0.7, 1, 0.01])
+        self.barDim = np.array([0.7, 1, 0.01])
+        self.center_list = np.array([[0,2], [0, -2]])
 
-        self.barDim = np.array([1.5, 1, 0.01])
-        self.center_list = np.array([[0, 2], [0, -2]])
+        # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
         # self.center_list = np.random.uniform(-2, 2, (100, 2))
@@ -143,13 +143,12 @@ class PlasticTestEnv(flex_env.FlexEnv):
         obs = self._get_obs()
         goal_1_attract_rwd = 1.5*(prev_distances_center_1 - curr_distances_center_1)
         goal_2_attract_rwd = 1.5*(prev_distances_center_2 - curr_distances_center_2)
-        part_movement_rwd = 0.1*np.mean(np.linalg.norm(
+        part_movement_rwd = 0.3*np.mean(np.linalg.norm(
             (curr_state - prev_state)[:, 4::], axis=1), axis=1)
         num_outliers = -0.003*((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
         # print(num_outliers)
         rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
             part_movement_rwd + num_outliers
-        # print(rewards)
 
         info = {'Total Reward': np.mean(rewards),
                 'Goal 1 Attract': np.mean(goal_1_attract_rwd),
@@ -267,7 +266,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
                                       ] = self.idxPool[indices[j]]*1.7
                 self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        # self.setInitClusterParam(self.initClusterparam)
+        self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
@@ -374,3 +373,4 @@ class PlasticTestEnv(flex_env.FlexEnv):
                      np.array([0, 0, 1]) * (1 - color))
                 pg.draw.rect(surface, final_color,
                              pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
+
