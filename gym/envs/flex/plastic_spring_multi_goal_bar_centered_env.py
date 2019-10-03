@@ -29,13 +29,13 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 4
         self.clusterDim = np.array([5, 2, 5])
-        action_bound = np.array([[-2, -2, -1, -1, -1], [
-                                2, 2, 1, 1, 1]])
+        action_bound = np.array([[-5, -5, -1, -1, -1], [
+                                5, 5, 1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=True,
-                                  disableViewer=True)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=False,
+                                  disableViewer=False)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -268,10 +268,10 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
                 np.arange(self.idxPool.shape[0]), size=self.numInitClusters, replace=False)
             for j in range(self.numInitClusters):
                 self.initClusterparam[i, (j*6, j*6+2)
-                                      ] = self.idxPool[indices[j]]*1.7
+                                      ] = self.idxPool[indices[j]]*1.8
                 self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        # self.setInitClusterParam(self.initClusterparam)
+        self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
@@ -389,8 +389,8 @@ if __name__ == '__main__':
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((16, 5))
-        act[:,0:2] = 2 
-        act[:, -1] = 1
+        act[:,0:2] = 1
+        act[:, -1] = -1
         obs, rwd, done, info = env.step(act)
 
         if i % 100 == 0:

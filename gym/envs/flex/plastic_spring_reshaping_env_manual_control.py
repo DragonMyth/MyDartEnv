@@ -271,7 +271,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
                                       ] = self.idxPool[indices[j]]*1.7
                 self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        # self.setInitClusterParam(self.initClusterparam)
+        self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
