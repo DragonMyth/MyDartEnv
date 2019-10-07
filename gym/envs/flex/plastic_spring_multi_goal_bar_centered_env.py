@@ -29,13 +29,13 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 4
         self.clusterDim = np.array([5, 2, 5])
-        action_bound = np.array([[-5, -5, -1, -1, -1], [
-                                5, 5, 1, 1, 1]])
+        action_bound = np.array([[-7, -7, -1, -1, -1], [
+                                7, 7, 1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=False,
-                                  disableViewer=False)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=True,
+                                  disableViewer=True)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -43,12 +43,12 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        self.center_list = np.array([[0,2], [0, -2]])
+        # self.center_list = np.array([[0,2], [0, -2]])
 
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
-        # self.center_list = np.random.uniform(-2, 2, (100, 2))
+        self.center_list = np.random.uniform(-2, 2, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -278,11 +278,14 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         # Post-flex reset calculation
         self.global_rot = self.generate_rand_rot_vec()
 
-        self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
-                                     (self.numInstances, 1))
+        self.circle_center = np.zeros((self.numInstances,2))
+        for i in range(self.numInstances):
+             self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
+        self.circle_center = self.circle_center.astype(int)
 
-        goals = self.center_list.flatten()
-        self.set_goal(np.tile(goals, (self.numInstances, 1)))
+        goals = self.center_list[self.circle_center]
+        goals = np.reshape(goals,(self.numInstances,4))
+        self.set_goal(goals)
         self.setMapHalfExtent(self.mapHalfExtent)
 
         pos = np.random.uniform(-3, 3, (self.numInstances, 2))
@@ -389,7 +392,7 @@ if __name__ == '__main__':
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((16, 5))
-        act[:,0:2] = 1
+        act[:,0:2] = 0
         act[:, -1] = -1
         obs, rwd, done, info = env.step(act)
 
