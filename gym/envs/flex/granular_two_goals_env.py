@@ -15,7 +15,7 @@ except ImportError as e:
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
+class GranularTwoGoalsEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -34,7 +34,7 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=True,
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, disableViewerFlex=True,
                                   disableViewer=True)
 
         self.metadata = {
@@ -43,12 +43,12 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        # self.center_list = np.array([[0,2], [0, -2]])
+        self.center_list = np.array([[0,2], [0, -2]])
 
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
-        self.center_list = np.random.uniform(-3, 3, (100, 2))
+        # self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -383,7 +383,7 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = PlasticSpringMultiGoalBarCenteredEnv()
+    env = GranularTwoGoalsEnv()
 
     env.reset()
     for i in range(2000):

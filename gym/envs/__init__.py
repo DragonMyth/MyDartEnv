@@ -623,6 +623,13 @@ register(
 )
 
 register(
+    id='FlexGranularSweep-v4',
+    entry_point='gym.envs.flex:GranularTwoGoalsEnv',
+    max_episode_steps=1000,
+)
+
+
+register(
     id='FlexPlasticReshaping-v0',
     entry_point='gym.envs.flex:PlasticTestEnv',
     max_episode_steps=1000,

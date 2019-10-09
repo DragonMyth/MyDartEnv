@@ -29,8 +29,8 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 4
         self.clusterDim = np.array([5, 2, 5])
-        action_bound = np.array([[-self.mapHalfExtent, -self.mapHalfExtent, -1, -1, -1], [
-                                self.mapHalfExtent, self.mapHalfExtent, 1, 1, 1]])
+        action_bound = np.array([[-self.mapHalfExtent*1.5, -self.mapHalfExtent*1.5, -1, -1, -1], [
+                                self.mapHalfExtent*1.5, self.mapHalfExtent*1.5, 1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
@@ -150,7 +150,7 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
         rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
             part_movement_rwd + num_outliers
 
-        info = {'Total Reward': np.mean(rewards),
+        info = {
                 'Goal 1 Attract': np.mean(goal_1_attract_rwd),
                 'Goal 2 Attract': np.mean(goal_2_attract_rwd),
                 'Particle_Movement': np.mean(part_movement_rwd),
@@ -263,21 +263,23 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
                 np.arange(self.idxPool.shape[0]), size=self.numInitClusters, replace=False)
             for j in range(self.numInitClusters):
                 self.initClusterparam[i, (j*6, j*6+2)
-                                      ] = self.idxPool[indices[j]]*1.7
+                                      ] = self.idxPool[indices[j]]*1.8
                 self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        # self.setInitClusterParam(self.initClusterparam)
+        self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
         # Post-flex reset calculation
         self.global_rot = self.generate_rand_rot_vec()
 
-        self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
-                                     (self.numInstances, 1))
+        for i in range(self.numInstances):
+             self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
+        self.circle_center = self.circle_center.astype(int)
 
-        goals = self.center_list.flatten()
-        self.set_goal(np.tile(goals, (self.numInstances, 1)))
+        goals = self.center_list[self.circle_center]
+        goals = np.reshape(goals,(self.numInstances,4))
+        self.set_goal(goals)
         self.setMapHalfExtent(self.mapHalfExtent)
 
         pos = np.random.uniform(-3, 3, (self.numInstances, 2))
@@ -380,7 +382,7 @@ if __name__ == '__main__':
 
     env.reset()
     for i in range(2000):
-        # env.render()
+        env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((16, 5))
