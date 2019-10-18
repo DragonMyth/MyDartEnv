@@ -15,28 +15,27 @@ except ImportError as e:
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticTestEnv(flex_env.FlexEnv):
+class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        obs_size = self.resolution * self.resolution * 2 + 8
+        obs_size = self.resolution * self.resolution * 2 + 4
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
         self.mapPartitionSize = 3
-        self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
-            self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
+        self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize)-int(
+            self.mapPartitionSize/2), np.arange(self.mapPartitionSize)-int(self.mapPartitionSize/2))])
 
         self.numInitClusters = 4
         self.clusterDim = np.array([5, 2, 5])
-        action_bound = np.array([[-7, -7, -np.pi / 2, -1], [
-            7, 7, np.pi / 2, 1]])
+        action_bound = np.array([[-7, -7,  -np.pi/2,-1], [
+                                7, 7,  np.pi/2,1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5,
-                                  disableViewerFlex=False,
-                                  disableViewer=False)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=True,
+                                  disableViewer=True)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -44,7 +43,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        self.center_list = np.array([[0, 2.0], [0, -2.0]])
+        self.center_list = np.array([[0,0.0], [0,0]])
+        # self.center_list = np.array([[2.0,0], [-2.0,0]])
 
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
@@ -59,7 +59,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.global_rot = self.generate_rand_rot_vec()
 
         self.initClusterparam = np.zeros(
-            (self.numInstances, 6 * self.numInitClusters))
+            (self.numInstances, 6*self.numInitClusters))
 
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -73,8 +73,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         rand_rot_vec[:, 1, 0] = np.sin(rand_rot_ang)
         rand_rot_vec[:, 1, 1] = np.cos(rand_rot_ang)
         return rand_rot_vec
-
-    def angle_to_rot_matrix(self, angles):
+    def angle_to_rot_matrix(self,angles):
         rot_vec = np.ones((self.numInstances, 2, 2))
 
         rot_vec[:, 0, 0] = np.cos(angles)
@@ -82,7 +81,6 @@ class PlasticTestEnv(flex_env.FlexEnv):
         rot_vec[:, 1, 0] = np.sin(angles)
         rot_vec[:, 1, 1] = np.cos(angles)
         return rot_vec
-
     def _step(self, action):
         action = action * self.action_scale
         prev_state = self.get_state()
@@ -105,22 +103,22 @@ class PlasticTestEnv(flex_env.FlexEnv):
             prev_state - expanded_group2_centers, axis=2)[:, 4::]
 
         partition_group1 = np.partition(prev_distances_center_1, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
+            :, :half_part_cnt]
 
         prev_distances_center_1 = np.sum(partition_group1, axis=1)
 
         partition_group2 = np.partition(prev_distances_center_2, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
+            :, :half_part_cnt]
         prev_distances_center_2 = np.sum(partition_group2, axis=1)
 
-        rot_mat = self.angle_to_rot_matrix(action[:, 2])
+        rot_mat = self.angle_to_rot_matrix(action[:,2])
 
-        flex_action = np.zeros((self.numInstances, 5))
-        flex_action[:, -1] = action[:, -1]
+        flex_action = np.zeros((self.numInstances,5))
+        flex_action[:,-1] = action[:,-1]
         for i in range(action.shape[0]):
-            bar_rot_trans = prev_state[i, 1]
-            bar_rot_vec = bar_rot_trans / np.linalg.norm(bar_rot_trans)
-            bar_rot = np.zeros((2, 2))
+            bar_rot_trans = prev_state[i,1]
+            bar_rot_vec = bar_rot_trans/np.linalg.norm(bar_rot_trans)
+            bar_rot = np.zeros((2,2))
             bar_rot[0, 0] = bar_rot_vec[0]
             bar_rot[0, 1] = -bar_rot_vec[1]
             bar_rot[1, 0] = bar_rot_vec[1]
@@ -132,11 +130,12 @@ class PlasticTestEnv(flex_env.FlexEnv):
                 action[i, 2:4].transpose(), bar_rot).transpose()
 
             action[i, 0:2] = targ_pos_trans
-            flex_action[i, 0:2] = action[i, 0:2] + prev_state[i, 0]
-            flex_action[i, 2:4] = np.matmul(prev_state[i, 1], rot_mat[i].transpose())
+            flex_action[i,0:2] = action[i, 0:2]+prev_state[i,0]
+            flex_action[i,2:4] = np.matmul(prev_state[i,1], rot_mat[i].transpose())
             # action[i, 2:4] = targ_rot_trans
 
         # action[:,0:2] += prev_state[:,0]
+
 
         done = self.do_simulation(flex_action, self.frame_skip)
 
@@ -148,12 +147,12 @@ class PlasticTestEnv(flex_env.FlexEnv):
             curr_state - expanded_group2_centers, axis=2)[:, 4::]
 
         partition_group1 = np.partition(curr_distances_center_1, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
+            :, :half_part_cnt]
 
         curr_distances_center_1 = np.sum(partition_group1, axis=1)
 
         partition_group2 = np.partition(curr_distances_center_2, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
+            :, :half_part_cnt]
         curr_distances_center_2 = np.sum(partition_group2, axis=1)
 
         goal_1_valid_idx = np.where(partition_group1 < 1)
@@ -166,14 +165,14 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         # print(num_outliers)
         obs = self._get_obs()
-        goal_1_attract_rwd = 1.5 * (prev_distances_center_1 - curr_distances_center_1)
-        goal_2_attract_rwd = 1.5 * (prev_distances_center_2 - curr_distances_center_2)
-        part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
+        goal_1_attract_rwd = 1.5*(prev_distances_center_1 - curr_distances_center_1)
+        goal_2_attract_rwd = 1.5*(prev_distances_center_2 - curr_distances_center_2)
+        part_movement_rwd = 0.3*np.mean(np.linalg.norm(
             (curr_state - prev_state)[:, 4::], axis=1), axis=1)
-        num_outliers = -0.003 * ((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
+        num_outliers = -0.003*((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
         # print(num_outliers)
         rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
-                  part_movement_rwd + num_outliers
+            part_movement_rwd + num_outliers
 
         info = {'Total Reward': np.mean(rewards),
                 'Goal 1 Attract': np.mean(goal_1_attract_rwd),
@@ -182,7 +181,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
                 'Num Outliers rwd': np.mean(num_outliers),
 
                 }
-
+        
         return obs, rewards, done, info
 
     def _get_obs(self):
@@ -204,12 +203,14 @@ class PlasticTestEnv(flex_env.FlexEnv):
             bar_vel_trans = np.matmul(bar_state[2].transpose(
             ), self.global_rot[i].transpose()).transpose()
 
-            bar_rot_vec = bar_rot_trans / np.linalg.norm(bar_rot_trans)
-            bar_rot = np.zeros((2, 2))
+
+            bar_rot_vec = bar_rot_trans/np.linalg.norm(bar_rot_trans)
+            bar_rot = np.zeros((2,2))
             bar_rot[0, 0] = bar_rot_vec[0]
             bar_rot[0, 1] = -bar_rot_vec[1]
             bar_rot[1, 0] = bar_rot_vec[1]
             bar_rot[1, 1] = bar_rot_vec[0]
+
 
             bar_state[0] = bar_pos_trans
             bar_state[1] = bar_rot_trans
@@ -218,14 +219,14 @@ class PlasticTestEnv(flex_env.FlexEnv):
             bar_density = self.get_voxel_bar_density(
                 bar_state, self.global_rot[i])
             density = self.get_particle_density(
-                part_state, bar_state, bar_rot, normalized=True)
+                part_state, bar_state,bar_rot, normalized=True)
 
             goal_gradient = self.get_goal_gradient(
                 self.center_list[self.circle_center[i]], bar_state, bar_rot)
-
+            # bar_state[0:2]*=0
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(),
-                 ])
+                [bar_state[2:].flatten(), density.flatten(), goal_gradient.flatten(),
+                ])
 
             obs_list.append(obs)
 
@@ -240,11 +241,11 @@ class PlasticTestEnv(flex_env.FlexEnv):
         for i in range(goal.shape[0]):
             # print(goal[i])
             # print(bar_state[0])
-            goal[i] -= bar_state[0]
+            goal[i] -=bar_state[0]
 
             goal_rot = np.matmul(goal[i].transpose(),
                                  global_rot.transpose()).transpose()
-            goal_rot = np.clip(goal_rot, -self.mapHalfExtent, self.mapHalfExtent)
+            goal_rot = np.clip(goal_rot,-self.mapHalfExtent,self.mapHalfExtent)
             gradient += np.exp(-(((x - goal_rot[0]) ** 2 +
                                   (y - goal_rot[1]) ** 2) / (2.0 * sigma ** 2)))
 
@@ -272,12 +273,12 @@ class PlasticTestEnv(flex_env.FlexEnv):
         H = np.clip(H, 0, 1)
         return H
 
-    def get_particle_density(self, particles, bar_state, global_rot, normalized=True):
+    def get_particle_density(self, particles, bar_state ,global_rot, normalized=True):
         particles -= bar_state[0]
 
         particles_trans = np.matmul(particles, global_rot.transpose())
-
-        particles_trans = np.clip(particles_trans, -self.mapHalfExtent, self.mapHalfExtent)
+        
+        particles_trans = np.clip(particles_trans,-self.mapHalfExtent,self.mapHalfExtent)
         H = self.get_density(particles_trans, self.resolution,
                              2.5, self.mapHalfExtent)
         x_pos = particles_trans[:, 0]
@@ -295,30 +296,30 @@ class PlasticTestEnv(flex_env.FlexEnv):
     def _reset(self):
         # Pre-flex reset calculation
         self.initClusterparam = np.zeros(
-            (self.numInstances, 6 * self.numInitClusters))
+            (self.numInstances, 6*self.numInitClusters))
         for i in range(self.numInstances):
 
             indices = np.random.choice(
                 np.arange(self.idxPool.shape[0]), size=self.numInitClusters, replace=False)
             for j in range(self.numInitClusters):
-                self.initClusterparam[i, (j * 6, j * 6 + 2)
-                ] = self.idxPool[indices[j]] * 1.8
-                self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
+                self.initClusterparam[i, (j*6, j*6+2)
+                                      ] = self.idxPool[indices[j]]*1.8
+                self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        # self.setInitClusterParam(self.initClusterparam)
+        self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
         # Post-flex reset calculation
         self.global_rot = self.generate_rand_rot_vec()
 
-        self.circle_center = np.zeros((self.numInstances, 2))
+        self.circle_center = np.zeros((self.numInstances,2))
         for i in range(self.numInstances):
-            self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
+             self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
         self.circle_center = self.circle_center.astype(int)
 
         goals = self.center_list[self.circle_center]
-        goals = np.reshape(goals, (self.numInstances, 4))
+        goals = np.reshape(goals,(self.numInstances,4))
         self.set_goal(goals)
         self.setMapHalfExtent(self.mapHalfExtent)
 
@@ -371,9 +372,9 @@ class PlasticTestEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
 
-        part_map = obs[0, 8:8 + self.resolution * self.resolution]
-        goal_map = obs[0, 8 + self.resolution * self.resolution:8 +
-                                                                2 * (self.resolution * self.resolution)]
+        part_map = obs[0, 4:4 + self.resolution * self.resolution]
+        goal_map = obs[0, 4 + self.resolution * self.resolution:4 +
+                       2 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
 
@@ -411,7 +412,28 @@ class PlasticTestEnv(flex_env.FlexEnv):
                 color = np.clip(color, 0, 1)
 
                 final_color = 255 * \
-                              (np.array([1, 0, 0]) * color +
-                               np.array([0, 0, 1]) * (1 - color))
+                    (np.array([1, 0, 0]) * color +
+                     np.array([0, 0, 1]) * (1 - color))
                 pg.draw.rect(surface, final_color,
                              pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
+if __name__ == '__main__':
+    env = PlasticSpringMultiGoalBarCenteredRotEnv()
+
+    env.reset()
+    for i in range(2000):
+        # env.render()
+        # print(pyFlex.get_state())
+        # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
+        act = np.zeros((49, 4))
+        act[:,1] = 1
+        act[:,2] = 1
+        act[:, -1] = 1
+        obs, rwd, done, info = env.step(act)
+        env.render()
+        if i % 100 == 0:
+            print(i)
+        if i % 500 == 0:
+            env.reset()
+        if done:
+            # env.reset()
+            break

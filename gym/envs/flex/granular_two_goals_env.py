@@ -34,8 +34,8 @@ class GranularTwoGoalsEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, disableViewerFlex=True,
-                                  disableViewer=True)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, disableViewerFlex=False,
+                                  disableViewer=False)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -43,10 +43,10 @@ class GranularTwoGoalsEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        self.center_list = np.array([[0,2], [0, -2]])
+        # self.center_list = np.array([[0,2], [0, -2]])
 
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
-        # self.center_list = np.array([[2, -2], [-2, 2]])
+        self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
         # self.center_list = np.random.uniform(-3, 3, (100, 2))
 
@@ -270,7 +270,7 @@ class GranularTwoGoalsEnv(flex_env.FlexEnv):
                                       ] = self.idxPool[indices[j]]*1.8
                 self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        self.setInitClusterParam(self.initClusterparam)
+        # self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 

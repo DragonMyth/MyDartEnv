@@ -43,12 +43,12 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        # self.center_list = np.array([[0,2], [0, -2]])
+        self.center_list = np.array([[0,2], [0, -2]])
 
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
-        self.center_list = np.random.uniform(-3, 3, (100, 2))
+        # self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
