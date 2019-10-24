@@ -43,13 +43,13 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        self.center_list = np.array([[0,0.0], [0,0]])
+        # self.center_list = np.array([[0.0,0.0], [0.0,0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
-
+        # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
-        # self.center_list = np.random.uniform(-3, 3, (100, 2))
+        self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -136,8 +136,8 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
         # action[:,0:2] += prev_state[:,0]
 
-
         done = self.do_simulation(flex_action, self.frame_skip)
+
 
         curr_state = self.get_state()
 
@@ -170,16 +170,17 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         part_movement_rwd = 0.3*np.mean(np.linalg.norm(
             (curr_state - prev_state)[:, 4::], axis=1), axis=1)
         num_outliers = -0.003*((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
+
         # print(num_outliers)
         rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
             part_movement_rwd + num_outliers
 
-        info = {'Total Reward': np.mean(rewards),
+        info = {
+            'Total Reward': np.mean(rewards),
                 'Goal 1 Attract': np.mean(goal_1_attract_rwd),
                 'Goal 2 Attract': np.mean(goal_2_attract_rwd),
                 'Particle_Movement': np.mean(part_movement_rwd),
                 'Num Outliers rwd': np.mean(num_outliers),
-
                 }
         
         return obs, rewards, done, info
@@ -237,6 +238,8 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         x, y = np.meshgrid(np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution),
                            np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution))
         sigma = 0.3
+        # sigma = 4
+
         gradient = np.zeros(x.shape)
         for i in range(goal.shape[0]):
             # print(goal[i])
@@ -316,7 +319,11 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.circle_center = np.zeros((self.numInstances,2))
         for i in range(self.numInstances):
              self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
+
         self.circle_center = self.circle_center.astype(int)
+
+        # self.circle_center[:,1] =self.circle_center[:,0]
+
 
         goals = self.center_list[self.circle_center]
         goals = np.reshape(goals,(self.numInstances,4))

@@ -19,7 +19,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        obs_size = self.resolution * self.resolution * 2 + 8
+        obs_size = self.resolution * self.resolution * 2 + 4
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -44,12 +44,13 @@ class PlasticTestEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        self.center_list = np.array([[0, 2.0], [0, -2.0]])
+        # self.center_list = np.array([[0.0,0.0], [0.0,0.0]])
+        # self.center_list = np.array([[2.0,0], [-2.0,0]])
 
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
-        # self.center_list = np.random.uniform(-3, 3, (100, 2))
+        self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -168,20 +169,23 @@ class PlasticTestEnv(flex_env.FlexEnv):
         obs = self._get_obs()
         goal_1_attract_rwd = 1.5 * (prev_distances_center_1 - curr_distances_center_1)
         goal_2_attract_rwd = 1.5 * (prev_distances_center_2 - curr_distances_center_2)
-        part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
+        part_movement_rwd = 3 * np.mean(np.linalg.norm(
             (curr_state - prev_state)[:, 4::], axis=1), axis=1)
-        num_outliers = -0.003 * ((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
+        num_outliers = -0.1 * ((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
+
         # print(num_outliers)
         rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
                   part_movement_rwd + num_outliers
 
-        info = {'Total Reward': np.mean(rewards),
-                'Goal 1 Attract': np.mean(goal_1_attract_rwd),
-                'Goal 2 Attract': np.mean(goal_2_attract_rwd),
-                'Particle_Movement': np.mean(part_movement_rwd),
-                'Num Outliers rwd': np.mean(num_outliers),
+        # rewards = 100*(np.linalg.norm(prev_img_dif,axis=1)-np.linalg.norm(curr_img_dif,axis=1))+part_movement_rwd
+        info = {
+            'Total Reward': np.mean(rewards),
+            'Goal 1 Attract': np.mean(goal_1_attract_rwd),
+            'Goal 2 Attract': np.mean(goal_2_attract_rwd),
+            'Particle_Movement': np.mean(part_movement_rwd),
+            'Num Outliers rwd': np.mean(num_outliers),
 
-                }
+        }
 
         return obs, rewards, done, info
 
@@ -222,9 +226,9 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
             goal_gradient = self.get_goal_gradient(
                 self.center_list[self.circle_center[i]], bar_state, bar_rot)
-
+            # bar_state[0:2]*=0
             obs = np.concatenate(
-                [bar_state.flatten(), density.flatten(), goal_gradient.flatten(),
+                [bar_state[2:].flatten(), density.flatten(), goal_gradient.flatten(),
                  ])
 
             obs_list.append(obs)
@@ -236,6 +240,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
         x, y = np.meshgrid(np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution),
                            np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution))
         sigma = 0.3
+        # sigma = 4
+
         gradient = np.zeros(x.shape)
         for i in range(goal.shape[0]):
             # print(goal[i])
@@ -315,7 +321,10 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.circle_center = np.zeros((self.numInstances, 2))
         for i in range(self.numInstances):
             self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
+
         self.circle_center = self.circle_center.astype(int)
+
+        self.circle_center[:, 1] = self.circle_center[:, 0]
 
         goals = self.center_list[self.circle_center]
         goals = np.reshape(goals, (self.numInstances, 4))
@@ -371,8 +380,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
 
-        part_map = obs[0, 8:8 + self.resolution * self.resolution]
-        goal_map = obs[0, 8 + self.resolution * self.resolution:8 +
+        part_map = obs[0, 4:4 + self.resolution * self.resolution]
+        goal_map = obs[0, 4 + self.resolution * self.resolution:4 +
                                                                 2 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
@@ -415,3 +424,4 @@ class PlasticTestEnv(flex_env.FlexEnv):
                                np.array([0, 0, 1]) * (1 - color))
                 pg.draw.rect(surface, final_color,
                              pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
+
