@@ -309,7 +309,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
                                       ] = self.idxPool[indices[j]]*1.8
                 self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        self.setInitClusterParam(self.initClusterparam)
+        # self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
@@ -322,7 +322,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
         self.circle_center = self.circle_center.astype(int)
 
-        # self.circle_center[:,1] =self.circle_center[:,0]
+        self.circle_center[:,1] =self.circle_center[:,0]
 
 
         goals = self.center_list[self.circle_center]
