@@ -27,7 +27,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
             self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
 
-        self.numInitClusters = 4
+        self.numInitClusters = 1
+        self.randomCluster = True
         self.clusterDim = np.array([5, 2, 5])
         action_bound = np.array([[-7, -7, -np.pi / 2, -1], [
             7, 7, np.pi / 2, 1]])
@@ -44,13 +45,13 @@ class PlasticTestEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        # self.center_list = np.array([[0.0,0.0], [0.0,0.0]])
+        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
-
+        # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
-        self.center_list = np.random.uniform(-3, 3, (100, 2))
+        # self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -84,35 +85,136 @@ class PlasticTestEnv(flex_env.FlexEnv):
         rot_vec[:, 1, 1] = np.cos(angles)
         return rot_vec
 
+    # def _step(self, action):
+    #     action = action * self.action_scale
+    #     prev_state = self.get_state()
+    #     centers = self.center_list[self.circle_center]
+    #     half_part_cnt = int(prev_state[:, 4::].shape[1] / 2)
+    #     group1_center = centers[:, 0]
+    #     group2_center = centers[:, 1]
+    #
+    #     expanded_group1_centers = np.expand_dims(group1_center, axis=1)
+    #     expanded_group1_centers = np.repeat(
+    #         expanded_group1_centers, prev_state.shape[1], axis=1)
+    #
+    #     expanded_group2_centers = np.expand_dims(group2_center, axis=1)
+    #     expanded_group2_centers = np.repeat(
+    #         expanded_group2_centers, prev_state.shape[1], axis=1)
+    #
+    #     prev_distances_center_1 = np.linalg.norm(
+    #         prev_state - expanded_group1_centers, axis=2)[:, 4::]
+    #     prev_distances_center_2 = np.linalg.norm(
+    #         prev_state - expanded_group2_centers, axis=2)[:, 4::]
+    #
+    #     partition_group1 = np.partition(prev_distances_center_1, half_part_cnt, axis=1)[
+    #         :, :half_part_cnt]
+    #
+    #     prev_distances_center_1 = np.sum(partition_group1, axis=1)
+    #
+    #     partition_group2 = np.partition(prev_distances_center_2, half_part_cnt, axis=1)[
+    #         :, :half_part_cnt]
+    #     prev_distances_center_2 = np.sum(partition_group2, axis=1)
+    #
+    #     rot_mat = self.angle_to_rot_matrix(action[:,2])
+    #
+    #     flex_action = np.zeros((self.numInstances,5))
+    #     flex_action[:,-1] = action[:,-1]
+    #     for i in range(action.shape[0]):
+    #         bar_rot_trans = prev_state[i,1]
+    #         bar_rot_vec = bar_rot_trans/np.linalg.norm(bar_rot_trans)
+    #         bar_rot = np.zeros((2,2))
+    #         bar_rot[0, 0] = bar_rot_vec[0]
+    #         bar_rot[0, 1] = -bar_rot_vec[1]
+    #         bar_rot[1, 0] = bar_rot_vec[1]
+    #         bar_rot[1, 1] = bar_rot_vec[0]
+    #
+    #         targ_pos_trans = np.matmul(
+    #             action[i, 0:2].transpose(), bar_rot).transpose()
+    #         targ_rot_trans = np.matmul(
+    #             action[i, 2:4].transpose(), bar_rot).transpose()
+    #
+    #         action[i, 0:2] = targ_pos_trans
+    #         flex_action[i,0:2] = action[i, 0:2]+prev_state[i,0]
+    #         flex_action[i,2:4] = np.matmul(prev_state[i,1], rot_mat[i].transpose())
+    #         # action[i, 2:4] = targ_rot_trans
+    #
+    #     # action[:,0:2] += prev_state[:,0]
+    #
+    #     done = self.do_simulation(flex_action, self.frame_skip)
+    #
+    #
+    #     curr_state = self.get_state()
+    #
+    #     curr_distances_center_1 = np.linalg.norm(
+    #         curr_state - expanded_group1_centers, axis=2)[:, 4::]
+    #     curr_distances_center_2 = np.linalg.norm(
+    #         curr_state - expanded_group2_centers, axis=2)[:, 4::]
+    #
+    #     partition_group1 = np.partition(curr_distances_center_1, half_part_cnt, axis=1)[
+    #         :, :half_part_cnt]
+    #
+    #     curr_distances_center_1 = np.sum(partition_group1, axis=1)
+    #
+    #     partition_group2 = np.partition(curr_distances_center_2, half_part_cnt, axis=1)[
+    #         :, :half_part_cnt]
+    #     curr_distances_center_2 = np.sum(partition_group2, axis=1)
+    #
+    #     goal_1_valid_idx = np.where(partition_group1 < 1)
+    #     goal_1_cnt = np.bincount(
+    #         goal_1_valid_idx[0], minlength=self.numInstances)
+    #
+    #     goal_2_valid_idx = np.where(partition_group2 < 1)
+    #     goal_2_cnt = np.bincount(
+    #         goal_2_valid_idx[0], minlength=self.numInstances)
+    #
+    #     # print(num_outliers)
+    #     obs = self._get_obs()
+    #     goal_1_attract_rwd = 1.5*(prev_distances_center_1 - curr_distances_center_1)
+    #     goal_2_attract_rwd = 1.5*(prev_distances_center_2 - curr_distances_center_2)
+    #     part_movement_rwd = 0.3*np.mean(np.linalg.norm(
+    #         (curr_state - prev_state)[:, 4::], axis=1), axis=1)
+    #     num_outliers = -0.003*((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
+    #
+    #
+    #     rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
+    #         part_movement_rwd + num_outliers
+    #
+    #     info = {
+    #         'Total Reward': np.mean(rewards),
+    #             'Goal 1 Attract': np.mean(goal_1_attract_rwd),
+    #             'Goal 2 Attract': np.mean(goal_2_attract_rwd),
+    #             'Particle_Movement': np.mean(part_movement_rwd),
+    #             'Num Outliers rwd': np.mean(num_outliers),
+    #             }
+    #
+    #     return obs, rewards, done, info
+
     def _step(self, action):
         action = action * self.action_scale
         prev_state = self.get_state()
         centers = self.center_list[self.circle_center]
-        half_part_cnt = int(prev_state[:, 4::].shape[1] / 2)
         group1_center = centers[:, 0]
-        group2_center = centers[:, 1]
 
         expanded_group1_centers = np.expand_dims(group1_center, axis=1)
         expanded_group1_centers = np.repeat(
             expanded_group1_centers, prev_state.shape[1], axis=1)
 
-        expanded_group2_centers = np.expand_dims(group2_center, axis=1)
-        expanded_group2_centers = np.repeat(
-            expanded_group2_centers, prev_state.shape[1], axis=1)
+        expanded_bar_centers = np.expand_dims(prev_state[:, 0], axis=1)
+        expanded_bar_centers = np.repeat(expanded_bar_centers, prev_state.shape[1], axis=1)
 
         prev_distances_center_1 = np.linalg.norm(
             prev_state - expanded_group1_centers, axis=2)[:, 4::]
-        prev_distances_center_2 = np.linalg.norm(
-            prev_state - expanded_group2_centers, axis=2)[:, 4::]
 
-        partition_group1 = np.partition(prev_distances_center_1, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
+        to_bar_dist_prev = np.linalg.norm(prev_state - expanded_bar_centers, axis=2)[:, 4::]
 
-        prev_distances_center_1 = np.sum(partition_group1, axis=1)
+        outlier_dist_prev = np.zeros(self.numInstances)
+        for i in range(self.numInstances):
 
-        partition_group2 = np.partition(prev_distances_center_2, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
-        prev_distances_center_2 = np.sum(partition_group2, axis=1)
+            dist = to_bar_dist_prev[i]
+            dist = dist[np.argmax(prev_distances_center_1[i])]
+            outlier_dist_prev[i] = dist
+
+        prev_distances_center_1 = np.sum(prev_distances_center_1, axis=1)
 
         rot_mat = self.angle_to_rot_matrix(action[:, 2])
 
@@ -137,54 +239,42 @@ class PlasticTestEnv(flex_env.FlexEnv):
             flex_action[i, 2:4] = np.matmul(prev_state[i, 1], rot_mat[i].transpose())
             # action[i, 2:4] = targ_rot_trans
 
-        # action[:,0:2] += prev_state[:,0]
-
         done = self.do_simulation(flex_action, self.frame_skip)
 
         curr_state = self.get_state()
 
         curr_distances_center_1 = np.linalg.norm(
             curr_state - expanded_group1_centers, axis=2)[:, 4::]
-        curr_distances_center_2 = np.linalg.norm(
-            curr_state - expanded_group2_centers, axis=2)[:, 4::]
 
-        partition_group1 = np.partition(curr_distances_center_1, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
+        curr_distances_center_1 = np.sum(curr_distances_center_1, axis=1)
 
-        curr_distances_center_1 = np.sum(partition_group1, axis=1)
+        expanded_bar_centers = np.expand_dims(curr_state[:, 0], axis=1)
+        expanded_bar_centers = np.repeat(expanded_bar_centers, curr_state.shape[1], axis=1)
 
-        partition_group2 = np.partition(curr_distances_center_2, half_part_cnt, axis=1)[
-                           :, :half_part_cnt]
-        curr_distances_center_2 = np.sum(partition_group2, axis=1)
+        to_bar_dist_curr = np.linalg.norm(curr_state - expanded_bar_centers, axis=2)[:, 4::]
 
-        goal_1_valid_idx = np.where(partition_group1 < 1)
-        goal_1_cnt = np.bincount(
-            goal_1_valid_idx[0], minlength=self.numInstances)
+        outlier_dist_curr = np.zeros(self.numInstances)
+        for i in range(self.numInstances):
 
-        goal_2_valid_idx = np.where(partition_group2 < 1)
-        goal_2_cnt = np.bincount(
-            goal_2_valid_idx[0], minlength=self.numInstances)
+            dist = to_bar_dist_curr[i]
+            dist = dist[np.argmax(prev_distances_center_1[i])]
+            outlier_dist_curr[i] = dist
 
-        # print(num_outliers)
         obs = self._get_obs()
         goal_1_attract_rwd = 1.5 * (prev_distances_center_1 - curr_distances_center_1)
-        goal_2_attract_rwd = 1.5 * (prev_distances_center_2 - curr_distances_center_2)
-        part_movement_rwd = 3 * np.mean(np.linalg.norm(
+        part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
             (curr_state - prev_state)[:, 4::], axis=1), axis=1)
-        num_outliers = -0.1 * ((curr_state.shape[1] - 4) - goal_2_cnt - goal_1_cnt)
 
-        # print(num_outliers)
-        rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
-                  part_movement_rwd + num_outliers
+        outlier_attract_rwd = 1 * (outlier_dist_prev - outlier_dist_curr)
 
-        # rewards = 100*(np.linalg.norm(prev_img_dif,axis=1)-np.linalg.norm(curr_img_dif,axis=1))+part_movement_rwd
+        rewards = goal_1_attract_rwd + \
+                  part_movement_rwd + outlier_attract_rwd
+
         info = {
-            'Total Reward': np.mean(rewards),
-            'Goal 1 Attract': np.mean(goal_1_attract_rwd),
-            'Goal 2 Attract': np.mean(goal_2_attract_rwd),
-            'Particle_Movement': np.mean(part_movement_rwd),
-            'Num Outliers rwd': np.mean(num_outliers),
-
+            # 'Total Reward': np.mean(rewards),
+            # 'Goal 1 Attract': np.mean(goal_1_attract_rwd),
+            'Outliers Rwd': np.mean(outlier_attract_rwd),
+            # 'Particle_Movement': np.mean(part_movement_rwd),
         }
 
         return obs, rewards, done, info
@@ -299,19 +389,25 @@ class PlasticTestEnv(flex_env.FlexEnv):
         return full_state[:, :, (0, 2)]
 
     def _reset(self):
-        # Pre-flex reset calculation
-        self.initClusterparam = np.zeros(
-            (self.numInstances, 6 * self.numInitClusters))
-        for i in range(self.numInstances):
+        if self.randomCluster:
+            self.idxPool = np.array([[-1, -1]])
+            # self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
+            #     self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
+            # Pre-flex reset calculation
+            self.initClusterparam = np.zeros(
+                (self.numInstances, 6 * self.numInitClusters))
 
-            indices = np.random.choice(
-                np.arange(self.idxPool.shape[0]), size=self.numInitClusters, replace=False)
-            for j in range(self.numInitClusters):
-                self.initClusterparam[i, (j * 6, j * 6 + 2)
-                ] = self.idxPool[indices[j]] * 1.8
-                self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
+            for i in range(self.numInstances):
 
-        # self.setInitClusterParam(self.initClusterparam)
+                indices = np.random.choice(
+                    np.arange(self.idxPool.shape[0]), size=self.numInitClusters, replace=False)
+
+                for j in range(self.numInitClusters):
+                    self.initClusterparam[i, (j * 6, j * 6 + 2)
+                    ] = self.idxPool[indices[j]] * 1.8
+                    self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
+
+                self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
@@ -424,4 +520,3 @@ class PlasticTestEnv(flex_env.FlexEnv):
                                np.array([0, 0, 1]) * (1 - color))
                 pg.draw.rect(surface, final_color,
                              pg.Rect(x * w_gap, y * h_gap, (x + 1) * w_gap, (y + 1) * h_gap))
-
