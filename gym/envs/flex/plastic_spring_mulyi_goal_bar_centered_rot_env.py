@@ -35,8 +35,8 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=True,
-                                  disableViewer=True)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=False,
+                                  disableViewer=False)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -270,7 +270,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
             (curr_state - prev_state)[:, 4::], axis=1), axis=1)
 
         # outlier_attract_rwd = 0.03*(outlier_dist_prev-outlier_dist_curr)
-        outlier_attract_rwd = np.exp(-outlier_dist_curr)
+        outlier_attract_rwd = -0.01*outlier_dist_curr
 
         rewards = goal_1_attract_rwd  + \
             part_movement_rwd + outlier_attract_rwd
