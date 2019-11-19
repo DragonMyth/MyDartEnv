@@ -19,23 +19,32 @@ except ImportError as e:
 
 class FlexEnv(gym.Env):
     def __init__(self, frame_skip, observation_size, observation_bounds,action_bounds,
-                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0, disableViewerFlex = False,disableViewer = True):
+                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0, viewer=1):
         assert obs_type in ('parameter', 'image')
         assert action_type in ("continuous", "discrete")
 
 
-        self.disableViewer = disableViewer
+        self.viewerId = viewer
         self.screen = None
         self.screen_size = (800,800)
         self.sub_screen_gap = 4
-        if not self.disableViewer:
+
+        flex_viewer = False
+        if self.viewerId == 1:
+            flex_viewer = True
+        elif self.viewerId == 2:
             pg.init()
-            self.screen = pg.display.set_mode(self.screen_size)
+            # self.screen = pg.display.set_mode(self.screen_size)
+            self.screen = pg.display.set_mode(self.screen_size,DOUBLEBUF|OPENGL)
+
+            gluOrtho2D(0,self.screen_size[0],self.screen_size[1],0)
             # gluPerspective(45, (self.screen_size[0] / self.screen_size[1]), 0.1, 50.0)
+        elif self.viewerId == 3:
+            flex_viewer = True
+            self.screen = pg.display.set_mode(self.screen_size)
 
 
-
-        pyFlex.setVisualize(not disableViewerFlex)
+        pyFlex.setVisualize(flex_viewer)
         pyFlex.chooseScene(scene)
         pyFlex.initialize()
 
@@ -127,13 +136,19 @@ class FlexEnv(gym.Env):
         return pyFlex.getParticleDensity(particles, resolution,width,mapHalfExtent)
 
     def _render(self, mode='human', close=False):
-        if(self.disableViewer):
-            return
-        else:
-            # pg.display.flip()
+        if(self.viewerId==2):
+            # pg.display.update()
+            pg.display.flip()
+            # img = pg.surfarray.array3d(self.screen).transpose([1, 0, 2])
+            img = np.zeros((1,1,3))
+        elif(self.viewerId==3):
             pg.display.update()
-            img = pg.surfarray.array3d(self.screen).transpose([1,0,2])
-            return img
+            img = pg.surfarray.array3d(self.screen).transpose([1, 0, 2])
+        else:
+
+            img = np.zeros((1,1,3))
+        return img
+
 
 if __name__ == '__main__':
     env = FlexEnv(frame_skip=5, observation_size=10, action_bounds=np.array([[-3, -3, -1, -1], [3, 3, 1, 1]]),scene=0)
