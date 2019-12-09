@@ -15,7 +15,7 @@ except ImportError as e:
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
+class GranularTwoGoalsEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -29,12 +29,12 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 4
         self.clusterDim = np.array([5, 2, 5])
-        action_bound = np.array([[-self.mapHalfExtent*1.5, -self.mapHalfExtent*1.5, -1, -1, -1], [
-                                self.mapHalfExtent*1.5, self.mapHalfExtent*1.5, 1, 1, 1]])
+        action_bound = np.array([[-7, -7, -1, -1, -1], [
+                                7, 7, 1, 1, 1]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, disableViewerFlex=False,
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, disableViewerFlex=False,
                                   disableViewer=False)
 
         self.metadata = {
@@ -43,17 +43,16 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
+        # self.center_list = np.array([[0,2], [0, -2]])
 
-        self.center_list = np.array([[0, 2], [0, -2]])
-        # self.center_list = np.array([[2, -2], [-2, 2]])
+        # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
+        self.center_list = np.array([[2, -2], [-2, 2]])
         # self.center_list = np.array([[0,0]])
-        # self.center_list = np.random.uniform(-2, 2, (100, 2))
+        # self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
-        self.circle_center = np.tile(np.random.choice(self.randGoalRange, size=2, replace=False),
-                                     (self.numInstances, 1))
+        self.circle_center = None
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
         self.global_rot = self.generate_rand_rot_vec()
@@ -113,6 +112,7 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
             action[i, 0:2] = targ_pos_trans
             action[i, 2:4] = targ_rot_trans
 
+        action[:,0:2] += prev_state[:,0]
         done = self.do_simulation(action, self.frame_skip)
 
         curr_state = self.get_state()
@@ -150,7 +150,7 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
         rewards = goal_1_attract_rwd + goal_2_attract_rwd + \
             part_movement_rwd + num_outliers
 
-        info = {
+        info = {'Total Reward': np.mean(rewards),
                 'Goal 1 Attract': np.mean(goal_1_attract_rwd),
                 'Goal 2 Attract': np.mean(goal_2_attract_rwd),
                 'Particle_Movement': np.mean(part_movement_rwd),
@@ -186,10 +186,10 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
             bar_density = self.get_voxel_bar_density(
                 bar_state, self.global_rot[i])
             density = self.get_particle_density(
-                part_state, self.global_rot[i], normalized=True)
+                part_state, bar_state,self.global_rot[i], normalized=True)
 
             goal_gradient = self.get_goal_gradient(
-                self.center_list[self.circle_center[i]], self.global_rot[i])
+                self.center_list[self.circle_center[i]], bar_state, self.global_rot[i])
 
             obs = np.concatenate(
                 [bar_state.flatten(), density.flatten(), goal_gradient.flatten(),
@@ -199,7 +199,7 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
 
         return np.array(obs_list)
 
-    def get_goal_gradient(self, goal, global_rot):
+    def get_goal_gradient(self, goal, bar_state, global_rot):
 
         x, y = np.meshgrid(np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution),
                            np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution))
@@ -208,6 +208,8 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
         for i in range(goal.shape[0]):
             goal_rot = np.matmul(goal[i].transpose(),
                                  global_rot.transpose()).transpose()
+            goal_rot -=bar_state[0]
+            goal_rot = np.clip(goal_rot,-self.mapHalfExtent,self.mapHalfExtent)
             gradient += np.exp(-(((x - goal_rot[0]) ** 2 +
                                   (y - goal_rot[1]) ** 2) / (2.0 * sigma ** 2)))
 
@@ -215,7 +217,7 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
 
     def get_voxel_bar_density(self, bar_state, global_rot):
 
-        center = bar_state[0]
+        center = np.zeros(2)
         direction = bar_state[1].copy()
         direction[1] = -direction[1]
         # half length is 1.5
@@ -235,14 +237,16 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
         H = np.clip(H, 0, 1)
         return H
 
-    def get_particle_density(self, particles, global_rot, normalized=True):
+    def get_particle_density(self, particles, bar_state ,global_rot, normalized=True):
 
-        particles_rot = np.matmul(particles, global_rot.transpose())
-
-        H = self.get_density(particles_rot, self.resolution,
+        particles_trans = np.matmul(particles, global_rot.transpose())
+        
+        particles_trans -= bar_state[0]
+        particles_trans = np.clip(particles_trans,-self.mapHalfExtent,self.mapHalfExtent)
+        H = self.get_density(particles_trans, self.resolution,
                              2.5, self.mapHalfExtent)
-        x_pos = particles_rot[:, 0]
-        y_pos = particles_rot[:, 1]
+        x_pos = particles_trans[:, 0]
+        y_pos = particles_trans[:, 1]
         if normalized:
             # H = H ** (1.0 / 2)
             H = H / 150
@@ -266,13 +270,14 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
                                       ] = self.idxPool[indices[j]]*1.8
                 self.initClusterparam[i, j*6+3:j*6+6] = self.clusterDim
 
-        self.setInitClusterParam(self.initClusterparam)
+        # self.setInitClusterParam(self.initClusterparam)
 
         flex_env.FlexEnv._reset(self)
 
         # Post-flex reset calculation
         self.global_rot = self.generate_rand_rot_vec()
 
+        self.circle_center = np.zeros((self.numInstances,2))
         for i in range(self.numInstances):
              self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
         self.circle_center = self.circle_center.astype(int)
@@ -282,7 +287,7 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
         self.set_goal(goals)
         self.setMapHalfExtent(self.mapHalfExtent)
 
-        pos = np.random.uniform(-3, 3, (self.numInstances, 2))
+        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 2))
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 1))
 
         # pos = np.random.uniform(-0.0,0.0,(self.numInstances,2))
@@ -378,20 +383,21 @@ class PlasticSpringMultiGoalKnnReshapingEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = PlasticSpringMultiGoalKnnReshapingEnv()
+    env = GranularTwoGoalsEnv()
 
     env.reset()
     for i in range(2000):
-        env.render()
+        # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((16, 5))
-        act[:, -1] = 1
+        act = np.zeros((49, 5))
+        act[:,0:2] = 1
+        act[:, -1] = -1
         obs, rwd, done, info = env.step(act)
 
         if i % 100 == 0:
             print(i)
-        if i % 300 == 0:
+        if i % 500 == 0:
             env.reset()
         if done:
             # env.reset()

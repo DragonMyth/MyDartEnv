@@ -17,12 +17,11 @@ except ImportError as e:
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticTestEnv(flex_env.FlexEnv):
+class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        self.bar_info_dim = 5
-        obs_size = self.resolution * self.resolution * 3 + self.bar_info_dim
+        obs_size = self.resolution * self.resolution * 2 + 5
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -33,16 +32,15 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.numInitClusters = 1
         self.randomCluster = True
         self.clusterDim = np.array([5, 2, 5])
+        action_bound = np.array([[-7, -7, -np.pi / 2, -1], [
+            7, 7, np.pi / 2, 1]])
 
-
-        action_bound = np.array([[-7, -7, -1,-1, -1], [
-            7, 7, 1,1, 1]])
-
-
+        # action_bound = np.array([[-7, -7,  -np.pi/2], [
+        #                         7, 7,  np.pi/2]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -69,6 +67,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
             (self.numInstances, 6 * self.numInitClusters))
 
         self.rolloutCnt = 0
+
         self.ghost = np.ones(self.numInstances)
 
     def generate_rand_rot_vec(self):
@@ -123,9 +122,29 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         prev_distances_center_1 = np.sum(prev_distances_center_1_per_part, axis=1)
 
+        rot_mat = self.angle_to_rot_matrix(action[:, 2])
 
-        action[:,0:2] += prev_state[:,0]
-        done = self.do_simulation(action, self.frame_skip)
+        flex_action = np.zeros((self.numInstances, 5))
+        flex_action[:, -1] = action[:, -1]
+        for i in range(action.shape[0]):
+            bar_rot_trans = prev_state[i, 1]
+            bar_rot_vec = bar_rot_trans / np.linalg.norm(bar_rot_trans)
+            bar_rot = np.zeros((2, 2))
+            bar_rot[0, 0] = bar_rot_vec[0]
+            bar_rot[0, 1] = -bar_rot_vec[1]
+            bar_rot[1, 0] = bar_rot_vec[1]
+            bar_rot[1, 1] = bar_rot_vec[0]
+
+            targ_pos_trans = np.matmul(
+                action[i, 0:2].transpose(), bar_rot).transpose()
+
+            action[i, 0:2] = targ_pos_trans
+            flex_action[i, 0:2] = action[i, 0:2] + prev_state[i, 0]
+            flex_action[i, 2:4] = np.matmul(prev_state[i, 1], rot_mat[i].transpose())
+            # action[i, 2:4] = targ_rot_trans
+
+        # flex_action[:,-1] = -1
+        done = self.do_simulation(flex_action, self.frame_skip)
 
         curr_state = self.get_state()
 
@@ -153,18 +172,15 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         obs = self._get_obs()
         # 1.5
-        goal_1_attract_rwd = 1.5* (prev_distances_center_1- curr_distances_center_1)
-        # goal_1_attract_rwd = np.exp(-curr_distances_center_1/50)
+        goal_1_attract_rwd = 5* (prev_distances_center_1- curr_distances_center_1)
 
-        # part_movement_rwd = 0.3*np.mean(np.linalg.norm(
-        #     (curr_state - prev_state)[:, 4::], axis=1), axis=1)
         part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
             (curr_state - prev_state), axis=2)[:, 4::] * (curr_distances_center_1_per_part), axis=1) * 10
 
-        outlier_attract_rwd = (outlier_dist_prev - outlier_dist_curr) * 5
+        outlier_attract_rwd = 0.3*(outlier_dist_prev - outlier_dist_curr)
         # outlier_attract_rwd = -0.01*outlier_dist_curr
-        num_outliers = -0.01 * ((curr_state.shape[1] - 4) - goal_1_cnt) * 5
-        print(num_outliers)
+        num_outliers = -0.001 * ((curr_state.shape[1] - 4) - goal_1_cnt) * 5 
+        # print(num_outliers)
         rewards = goal_1_attract_rwd + \
                   part_movement_rwd + outlier_attract_rwd + num_outliers
 
@@ -177,86 +193,6 @@ class PlasticTestEnv(flex_env.FlexEnv):
         }
 
         return obs, rewards, done, info
-
-    # def _step(self, action):
-    #     action = action * self.action_scale
-    #     self.ghost = np.sign(action[:,-1])
-    #     prev_state = self.get_state()
-    #     centers = self.center_list[self.circle_center]
-    #     group1_center = centers[:, 0]
-
-    #     expanded_group1_centers = np.expand_dims(group1_center, axis=1)
-    #     expanded_group1_centers = np.repeat(
-    #         expanded_group1_centers, prev_state.shape[1], axis=1)
-
-    #     expanded_bar_centers = np.expand_dims(prev_state[:, 0], axis=1)
-    #     expanded_bar_centers = np.repeat(expanded_bar_centers, prev_state.shape[1], axis=1)
-
-    #     prev_distances_center_1 = np.linalg.norm(
-    #         prev_state - expanded_group1_centers, axis=2)[:, 4::]
-
-    #     to_bar_dist_prev = np.linalg.norm(prev_state - expanded_bar_centers, axis=2)[:, 4::]
-
-    #     outlier_dist_prev = np.zeros(self.numInstances)
-    #     for i in range(self.numInstances):
-    #         dist = to_bar_dist_prev[i]
-    #         dist = dist[np.argmax(prev_distances_center_1[i])]
-    #         outlier_dist_prev[i] = dist
-
-    #     prev_distances_center_1 = np.sum(prev_distances_center_1, axis=1)
-
-
-    #     action[:,0:2] += prev_state[:,0]
-    #     done = self.do_simulation(action, self.frame_skip)
-
-    #     curr_state = self.get_state()
-
-    #     curr_distances_center_1_per_part = np.linalg.norm(
-    #         curr_state - expanded_group1_centers, axis=2)[:, 4::]
-
-    #     curr_distances_center_1 = np.sum(curr_distances_center_1_per_part, axis=1)
-
-    #     expanded_bar_centers = np.expand_dims(curr_state[:, 0], axis=1)
-    #     expanded_bar_centers = np.repeat(expanded_bar_centers, curr_state.shape[1], axis=1)
-
-    #     to_bar_dist_curr = np.linalg.norm(curr_state - expanded_bar_centers, axis=2)[:, 4::]
-
-    #     outlier_dist_curr = np.zeros(self.numInstances)
-    #     for i in range(self.numInstances):
-    #         dist = to_bar_dist_curr[i]
-    #         dist = dist[np.argmax(prev_distances_center_1[i])]
-    #         outlier_dist_curr[i] = dist
-
-    #     goal_1_valid_idx = np.where(curr_distances_center_1 < 1)
-    #     goal_1_cnt = np.bincount(
-    #         goal_1_valid_idx[0], minlength=self.numInstances)
-
-    #     obs = self._get_obs()
-    #     # 1.5
-    #     goal_1_attract_rwd = 5* (prev_distances_center_1**2 - curr_distances_center_1**2)
-    #     # goal_1_attract_rwd = np.exp(-curr_distances_center_1/50)
-
-    #     # part_movement_rwd = 0.3*np.mean(np.linalg.norm(
-    #     #     (curr_state - prev_state)[:, 4::], axis=1), axis=1)
-    #     part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-    #         (curr_state - prev_state), axis=2)[:, 4::] * (curr_distances_center_1_per_part**2), axis=1) * 20
-
-    #     outlier_attract_rwd = 0.1 * (outlier_dist_prev - outlier_dist_curr) * 3
-    #     # outlier_attract_rwd = -0.01*outlier_dist_curr
-    #     num_outliers = -0.001 * ((curr_state.shape[1] - 4) - goal_1_cnt) * 5
-    #     # print(num_outliers)
-    #     rewards = goal_1_attract_rwd + \
-    #               part_movement_rwd + outlier_attract_rwd + num_outliers
-
-    #     info = {
-    #         # 'Total Reward': rewards[0],
-    #         'Goal 1 Attract': goal_1_attract_rwd[0],
-    #         'Outliers Rwd': outlier_attract_rwd[0],
-    #         'Outlier Num Penn': num_outliers[0],
-    #         'Particle_Movement': part_movement_rwd[0],
-    #     }
-
-    #     return obs, rewards, done, info
 
     def _get_obs(self):
 
@@ -289,18 +225,18 @@ class PlasticTestEnv(flex_env.FlexEnv):
             bar_state[1] = bar_rot_trans
             bar_state[2] = bar_vel_trans
 
-            bar_density = self.get_voxel_bar_density(
-                bar_state, self.global_rot[i])
+            # bar_density = self.get_voxel_bar_density(
+            #     bar_state, self.global_rot[i])
             density = self.get_particle_density(
-                part_state, bar_state, self.global_rot[i], normalized=True)
+                part_state, bar_state, bar_rot, normalized=True)
 
             goal_gradient = self.get_goal_gradient(
-                self.center_list[self.circle_center[i]], bar_state, self.global_rot[i])
+                self.center_list[self.circle_center[i]], bar_state, bar_rot)
             
-            # density_goal = self.get_goal_gradient(np.array([[-1.8,-1.8]]), bar_state, bar_rot)
+            density_goal = self.get_goal_gradient(np.array([[-1.8,-1.8]]), bar_state, bar_rot)
             # bar_state[0:2]*=0
             obs = np.concatenate(
-                [bar_state[2:].flatten(),[ghost], density.flatten(), goal_gradient.flatten(),bar_density.flatten()
+                [bar_state[2:].flatten(), [ghost], density.flatten(), goal_gradient.flatten()
                  ])
 
             obs_list.append(obs)
@@ -330,34 +266,24 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
     def get_voxel_bar_density(self, bar_state, global_rot):
 
-
-        x, y = np.meshgrid(np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution),
-                           np.linspace(-self.mapHalfExtent, self.mapHalfExtent, self.resolution))
-
-
-        H = np.zeros(x.shape)
-
         center = np.zeros(2)
         direction = bar_state[1].copy()
         direction[1] = -direction[1]
         # half length is 1.5
-        # end_point_1 = center + direction * self.barDim[0]
-        # end_point_2 = center - direction * self.barDim[0]
+        end_point_1 = center + direction * self.barDim[0]
+        end_point_2 = center - direction * self.barDim[0]
 
-        dx = x-center[0]
-        dy = y-center[1]
-        H = (1-np.abs(dx*direction[1]-dy*direction[0])/self.mapHalfExtent)**2
-        # step = 1.0 / 100
-        # interp = np.arange(0, 1 + step, step)
-        # interp = np.expand_dims(interp, axis=1)
-        # interp = np.repeat(interp, 2, axis=1)
-        # interp = (1 - interp) * end_point_1 + interp * end_point_2
-        # interp_x = interp[:, 0]
-        # interp_y = interp[:, 1]
+        step = 1.0 / 100
+        interp = np.arange(0, 1 + step, step)
+        interp = np.expand_dims(interp, axis=1)
+        interp = np.repeat(interp, 2, axis=1)
+        interp = (1 - interp) * end_point_1 + interp * end_point_2
+        interp_x = interp[:, 0]
+        interp_y = interp[:, 1]
 
-        # H = self.get_density(interp, self.resolution,
-        #                      1.5, self.mapHalfExtent) / 100
-        # H = np.clip(H, 0, 1)
+        H = self.get_density(interp, self.resolution,
+                             1.5, self.mapHalfExtent) / 100
+        H = np.clip(H, 0, 1)
         return H
 
     def get_particle_density(self, particles, bar_state, global_rot, normalized=True):
@@ -428,7 +354,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         pos[:, 0] = -1.8
         pos[:, 1] = -1.8
         rot = np.zeros((self.numInstances,1))
-        # rot[:,0] = np.pi/4
+        #rot[:,0] = np.pi/4
 
         #if self.rolloutCnt < 200:
         #    trans_pert = np.random.uniform(-2, 2, (self.numInstances, 2)) * self.rolloutCnt / 200.0
@@ -486,10 +412,10 @@ class PlasticTestEnv(flex_env.FlexEnv):
         ll = surfaces[2]
         lr = surfaces[3]
 
-        part_map = obs[0, self.bar_info_dim:self.bar_info_dim + self.resolution * self.resolution]
-        goal_map = obs[0, self.bar_info_dim + self.resolution * self.resolution:self.bar_info_dim +
+        part_map = obs[0, 4:4 + self.resolution * self.resolution]
+        goal_map = obs[0, 4 + self.resolution * self.resolution:4 +
                                                                 2 * (self.resolution * self.resolution)]
-        particle_goal_map = obs[0, self.bar_info_dim + 2*self.resolution * self.resolution:self.bar_info_dim +3 * (self.resolution * self.resolution)]
+        particle_goal_map = obs[0, 4 + 2*self.resolution * self.resolution:4 +3 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
 
@@ -527,11 +453,9 @@ class PlasticTestEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
     
-        part_map = obs[0, self.bar_info_dim:self.bar_info_dim + self.resolution * self.resolution]
-        goal_map = obs[0, self.bar_info_dim + self.resolution * self.resolution:self.bar_info_dim +
+        part_map = obs[0, 4:4 + self.resolution * self.resolution]
+        goal_map = obs[0, 4 + self.resolution * self.resolution:4 +
                        2 * (self.resolution * self.resolution)]
-        particle_goal_map = obs[0, self.bar_info_dim + 2*self.resolution * self.resolution:self.bar_info_dim +3 * (self.resolution * self.resolution)]
-
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
     
@@ -541,15 +465,11 @@ class PlasticTestEnv(flex_env.FlexEnv):
             goal_map, (self.resolution, self.resolution)).astype(np.float64)
         part_map = np.reshape(
             part_map, (self.resolution, self.resolution)).astype(np.float64)
-        particle_goal_map = np.reshape(particle_goal_map, (self.resolution, self.resolution)).astype(np.float64)
-
+    
         # self.draw_grid(tl, bar_map, 0, 1)
         self.draw_grid(tr, goal_map, 0, 1)
     
         self.draw_grid(lr, part_map, 0, 1)
-
-        self.draw_grid(ll, particle_goal_map, 0, 1)
-
         #
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() /
@@ -598,4 +518,24 @@ class PlasticTestEnv(flex_env.FlexEnv):
                 glRectd(offsetX + x * w_gap, offsetY + y * h_gap, offsetX + (x + 1) * w_gap, offsetY + (y + 1) * h_gap)
 
 
+if __name__ == '__main__':
+    env = PlasticSpringMultiGoalBarCenteredRotEnv()
 
+    env.reset()
+    for i in range(2000):
+        # env.render()
+        # print(pyFlex.get_state())
+        # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
+        act = np.zeros((49, 4))
+        act[:, 1] = 1
+        act[:, 2] = 1
+        # act[:, -1] = 1
+        obs, rwd, done, info = env.step(act)
+        env.render()
+        if i % 100 == 0:
+            print(i)
+        if i % 100 == 0:
+            env.reset()
+        if done:
+            # env.reset()
+            break

@@ -623,6 +623,13 @@ register(
 )
 
 register(
+    id='FlexGranularSweep-v4',
+    entry_point='gym.envs.flex:GranularTwoGoalsEnv',
+    max_episode_steps=1000,
+)
+
+
+register(
     id='FlexPlasticReshaping-v0',
     entry_point='gym.envs.flex:PlasticTestEnv',
     max_episode_steps=1000,
@@ -642,9 +649,28 @@ register(
 
 register(
     id='FlexPlasticReshaping-v3',
-    entry_point='gym.envs.flex:PlasticSpringMultiGoalKNNRWDEnv',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalKnnReshapingEnv',
     max_episode_steps=1000,
 )
+
+register(
+    id='FlexPlasticReshaping-v4',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalReshapingSolidEnv',
+    max_episode_steps=1000,
+)
+
+register(
+    id='FlexPlasticReshaping-v5',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalBarCenteredEnv',
+    max_episode_steps=1000,
+)
+
+register(
+    id='FlexPlasticReshaping-v6',
+    entry_point='gym.envs.flex:PlasticSpringMultiGoalBarCenteredRotEnv',
+    max_episode_steps=1000,
+)
+
 #
 #
 # register(

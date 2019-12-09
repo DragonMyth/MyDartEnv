@@ -7,6 +7,10 @@ from os import path
 import gym
 import six
 import pygame as pg
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
 try:
     import bindings as pyFlex
 except ImportError as e:
@@ -15,18 +19,32 @@ except ImportError as e:
 
 class FlexEnv(gym.Env):
     def __init__(self, frame_skip, observation_size, observation_bounds,action_bounds,
-                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0, disableViewer = True):
+                 dt=1 / 60.0, obs_type="parameter", action_type="continuous", scene=0, viewer=1):
         assert obs_type in ('parameter', 'image')
         assert action_type in ("continuous", "discrete")
 
-        self.disableViewer = disableViewer
+
+        self.viewerId = viewer
         self.screen = None
         self.screen_size = (800,800)
         self.sub_screen_gap = 4
-        if not self.disableViewer:
-            pg.init()
-            self.screen = pg.display.set_mode(self.screen_size,display=pg.OPENGL)
 
+        flex_viewer = False
+        if self.viewerId == 1:
+            flex_viewer = True
+        elif self.viewerId == 2:
+            pg.init()
+            # self.screen = pg.display.set_mode(self.screen_size)
+            self.screen = pg.display.set_mode(self.screen_size,DOUBLEBUF|OPENGL)
+
+            gluOrtho2D(0,self.screen_size[0],self.screen_size[1],0)
+            # gluPerspective(45, (self.screen_size[0] / self.screen_size[1]), 0.1, 50.0)
+        elif self.viewerId == 3:
+            flex_viewer = True
+            self.screen = pg.display.set_mode(self.screen_size)
+
+
+        pyFlex.setVisualize(flex_viewer)
         pyFlex.chooseScene(scene)
         pyFlex.initialize()
 
@@ -69,13 +87,16 @@ class FlexEnv(gym.Env):
 
         done = False
         save = self.save_video
-        for _ in range(n_frames):
-            path = os.path.join(self.video_path, 'frame_%d.tga' % self.step_cnt)
-            pyFlex.update_frame(save,path,tau.flatten())
-            save = False
-            done=pyFlex.sdl_main()
-            if done:
-                break
+        path = os.path.join(self.video_path, 'frame_%d.tga' % self.step_cnt)
+
+        pyFlex.simulateKSteps(save,path,tau.flatten(),n_frames)
+        # for _ in range(n_frames):
+        #     path = os.path.join(self.video_path, 'frame_%d.tga' % self.step_cnt)
+        #     pyFlex.update_frame(save,path,tau.flatten())
+        #     save = False
+        #     done=pyFlex.sdl_main()
+        #     if done:
+        #         break
 
         return done
     def _step(self, action):
@@ -102,14 +123,33 @@ class FlexEnv(gym.Env):
         # return full_state
         full_state = state_vec.reshape([self.numInstances,int(state_vec.shape[0]/self.numInstances),3])
         return full_state
+    def set_controller(self,controllerConfig):
+        pyFlex.setController(controllerConfig)
+
+    def set_goal(self,goals):
+        pyFlex.setGoal(goals)
+    def setMapHalfExtent(self,halfExtent):
+        pyFlex.setMapHalfExtent(halfExtent)
+    def setInitClusterParam(self,clusterParam):
+        pyFlex.setInitClusterParam(clusterParam)
+    def get_density(self,particles,resolution,width,mapHalfExtent):
+        return pyFlex.getParticleDensity(particles, resolution,width,mapHalfExtent)
 
     def _render(self, mode='human', close=False):
-        if(self.disableViewer):
-            return
-        else:
+        if(self.viewerId==2):
+            # pg.display.update()
+            pg.display.flip()
+            # img = pg.surfarray.array3d(self.screen).transpose([1, 0, 2])
+            img = np.zeros((1,1,3))
+        elif(self.viewerId==3):
             pg.display.update()
-            img = pg.surfarray.array3d(self.screen).transpose([1,0,2])
-            return img
+            img = pg.surfarray.array3d(self.screen).transpose([1, 0, 2])
+        else:
+
+            img = np.zeros((1,1,3))
+        return img
+
+
 if __name__ == '__main__':
     env = FlexEnv(frame_skip=5, observation_size=10, action_bounds=np.array([[-3, -3, -1, -1], [3, 3, 1, 1]]),scene=0)
 

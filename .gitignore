@@ -2,6 +2,7 @@
 *.pyc
 *.py~
 .DS_Store
+.vscode/
 
 # Setuptools distribution and build folders.
 /dist/
