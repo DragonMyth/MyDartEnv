@@ -632,7 +632,7 @@ register(
 register(
     id='FlexPlasticReshaping-v0',
     entry_point='gym.envs.flex:PlasticTestEnv',
-    max_episode_steps=1000,
+    max_episode_steps=500,
 )
 
 register(
@@ -644,7 +644,7 @@ register(
 register(
     id='FlexPlasticReshaping-v2',
     entry_point='gym.envs.flex:PlasticSpringMultiGoalReshapingEnv',
-    max_episode_steps=1000,
+    max_episode_steps=100,
 )
 
 register(
@@ -662,7 +662,7 @@ register(
 register(
     id='FlexPlasticReshaping-v5',
     entry_point='gym.envs.flex:PlasticSpringMultiGoalBarCenteredEnv',
-    max_episode_steps=1000,
+    max_episode_steps=500,
 )
 
 register(
