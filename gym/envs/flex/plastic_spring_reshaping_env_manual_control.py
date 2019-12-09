@@ -132,12 +132,8 @@ if __name__ == '__main__':
     import gym
     env = gym.make("FlexPlasticReshaping-v0")
 
-    # for i in range(1000):
-    #     glRotatef(1,0,1,0)
-    #     display()
-
-    env.unwrapped.save_video = True
-    env.unwrapped.video_path = '/home/yzhang/manual_control_data'
+    env.save_video = True
+    env.video_path = 'manual_control_data'
     import os
 
     if not os.path.exists(env.unwrapped.video_path):
