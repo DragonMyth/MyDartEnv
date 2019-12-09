@@ -42,14 +42,14 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 1, 0.01])
+        self.barDim = np.array([0.7, 0.5, 0.01])
         self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0, 2.0], [2.0, 2.0]])
 
@@ -99,7 +99,7 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
     def _step(self, action):
         action = action * self.action_scale
         self.ghost = np.sign(action[:,-1])
-        prev_state = self.get_state()
+        prev_state,prev_bar_state = self.get_state()
         centers = self.center_list[self.circle_center]
         group1_center = centers[:, 0]
 
@@ -111,9 +111,9 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         expanded_bar_centers = np.repeat(expanded_bar_centers, prev_state.shape[1], axis=1)
 
         prev_distances_center_1_per_part = (np.linalg.norm(
-            prev_state - expanded_group1_centers, axis=2)[:, 4::])**2
+            prev_state - expanded_group1_centers, axis=2))**2
 
-        to_bar_dist_prev = (np.linalg.norm(prev_state - expanded_bar_centers, axis=2)[:, 4::])**2
+        to_bar_dist_prev = (np.linalg.norm(prev_state - expanded_bar_centers, axis=2))**2
 
         outlier_dist_prev = np.zeros(self.numInstances)
         for i in range(self.numInstances):
@@ -128,9 +128,18 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
 
         action[:,0:2] += prev_state[:,0]
-        done = self.do_simulation(action, self.frame_skip)
 
-        curr_state = self.get_state()
+        flex_action = np.zeros(self.numInstances,6)
+        flex_action[:,0] = action[:,0]
+        flex_action[:,1] = action[:,0]
+        flex_action[:,2] = action[:,0]
+        flex_action[:,3] = action[:,0]
+        flex_action[:,4] = action[:,0]
+        flex_action[:,5] = action[:,0]
+
+        done = self.do_simulation(flex_action, self.frame_skip)
+
+        curr_state,curr_bar_state = self.get_state()
 
         curr_distances_center_1_per_part = (np.linalg.norm(
             curr_state - expanded_group1_centers, axis=2)[:, 4::])**2
@@ -181,15 +190,15 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
     def _get_obs(self):
 
-        states = self.get_state()
+        states,bar_states = self.get_state()
         obs_list = []
 
         for i in range(self.numInstances):
             ghost = self.ghost[i]
-            state = states[i]
-            part_state = state[4::]
+            # state = states[i]
+            part_state = states[i]
 
-            bar_state = state[:4]
+            bar_state = bar_states[i]
 
             bar_pos_trans = np.matmul(bar_state[0].transpose(
             ), self.global_rot[i].transpose()).transpose()
@@ -299,7 +308,9 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
-        return full_state[:, :, (0, 2)]
+        partState = full_state[4:, :, (0, 2)]
+        barState = full_state[:4]
+        return partState,barState
 
     def _reset(self):
         if self.randomCluster:
