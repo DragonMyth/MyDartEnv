@@ -17,3 +17,4 @@ from gym.envs.flex.plastic_spring_multi_goal_bar_centered_env import PlasticSpri
 from gym.envs.flex.plastic_spring_multi_goal_bar_centered_rot_env import PlasticSpringMultiGoalBarCenteredRotEnv
 from gym.envs.flex.granular_two_goals_env import GranularTwoGoalsEnv
 from gym.envs.flex.plastic_test_env import PlasticTestEnv
+from gym.envs.flex.plastic_spreading_rot_env import PlasticSpreadingRotEnv

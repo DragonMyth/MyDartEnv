@@ -17,7 +17,7 @@ except ImportError as e:
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
 
-class PlasticTestEnv(flex_env.FlexEnv):
+class PlasticSpreadingRotEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -483,7 +483,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = PlasticTestEnv()
+    env = PlasticSpreadingRotEnv()
 
     env.reset()
     for i in range(2000):

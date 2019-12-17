@@ -81,7 +81,7 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         self.ghost = np.ones(self.numInstances)
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum = 0
+        self.currCurriculum = 3
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
         # rand_rot_ang = np.ones(self.numInstances)
@@ -159,11 +159,11 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
         # curr_distances_center_1 = np.sum(curr_distances_center_1_per_part, axis=1)
 
-        # curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=1)
+        curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=1)
 
         # curr_distances_center_1 = np.mean(curr_distances_center_1_per_part, axis=1)
 
-        curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=1)
+        # curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=1)
 
         expanded_bar_centers = np.expand_dims(curr_state[:, 0], axis=1)
         expanded_bar_centers = np.repeat(expanded_bar_centers, curr_state.shape[1], axis=1)
@@ -367,7 +367,7 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
     def _reset(self):
 
-        if(np.mean(self.rolloutRet) > 50):
+        if(np.mean(self.rolloutRet) > 100):
             self.currCurriculum=min(3,self.currCurriculum+1)
             
         
@@ -375,7 +375,7 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         print("Return at current rollout: ", self.rolloutRet)            
         print("Mean Return at current rollout: ", np.mean(self.rolloutRet))            
 
-        self.randGoalRange = 2+self.currCurriculum
+        self.randGoalRange = 2+2*self.currCurriculum
         self.rolloutRet = np.zeros(self.numInstances)
 
         if self.randomCluster:
@@ -394,7 +394,6 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
 
                 indices = np.random.choice(
                     np.arange(self.idxPool.shape[0]), size=self.numInitClusters, replace=False)
-
                 for j in range(self.numInitClusters):
                     self.initClusterparam[i, (j * 6, j * 6 + 2)
                     ] = self.idxPool[indices[j]] * 1.8
@@ -410,7 +409,7 @@ class PlasticSpringMultiGoalBarCenteredEnv(flex_env.FlexEnv):
         self.circle_center = np.zeros((self.numInstances, 2))
         for i in range(self.numInstances):
             self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
-
+        self.circle_center[:,0] = np.arange(self.numInstances)%self.randGoalRange
 
         self.circle_center = self.circle_center.astype(int)
 

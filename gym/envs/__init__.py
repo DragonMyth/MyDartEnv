@@ -668,8 +668,15 @@ register(
 register(
     id='FlexPlasticReshaping-v6',
     entry_point='gym.envs.flex:PlasticSpringMultiGoalBarCenteredRotEnv',
-    max_episode_steps=1000,
+    max_episode_steps=500,
 )
+
+register(
+    id='FlexPlasticReshaping-v7',
+    entry_point='gym.envs.flex:PlasticSpreadingRotEnv',
+    max_episode_steps=500,
+)
+
 
 #
 #
