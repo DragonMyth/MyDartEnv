@@ -72,7 +72,7 @@ def generate_manual_action_abs_rot(w, a, s, d, cw, ccw, ghost, skip, obs):
     act = np.zeros((1, 5))
 
     linear_scale = 2
-    ang_scale = 0.1 * np.pi
+    ang_scale = 0.3 * np.pi
     linear_relative_target = np.zeros(2)
 
     target_angle =0# np.arctan2(bar_state[1,1],bar_state[1,0])
@@ -102,7 +102,8 @@ def generate_manual_action_abs_rot(w, a, s, d, cw, ccw, ghost, skip, obs):
         rot_vec[1, 0] = np.sin(target_angle)
         rot_vec[1, 1] = np.cos(target_angle)
 
-        rot_vec = np.matmul(bar_state[1].transpose(), rot_vec.transpose()).transpose()
+        rot_vec = np.matmul(bar_state[2:4].transpose(), rot_vec.transpose()).transpose()
+        # print(rot_vec)
         act[0, 0:2] =  linear_relative_target
         act[0, 2:4] = rot_vec
         act[0, 4] = ghost_cont
@@ -118,6 +119,14 @@ def generate_manual_action_abs_rot(w, a, s, d, cw, ccw, ghost, skip, obs):
     # print(act)
     return act
 
+
+def saveListToCsv(data,filename):
+    import csv
+    with open(filename,'w') as f:
+        wr = csv.writer(f)
+        for i in range(len(data)):
+            print(data[i])
+            wr.writerow(data[i])
 
 if __name__ == '__main__':
     import gym
@@ -136,6 +145,17 @@ if __name__ == '__main__':
 
     all_info = []
     ret = 0
+
+    states = []
+    # bar_states = []
+    states.append(["Number of Goals ", len(env.unwrapped.center_list)])
+    states.append(["Goals "]+list((env.unwrapped.center_list).flatten()))
+    states.append(["bar_half_extent_x", env.unwrapped.barDim.flatten()[0]])
+    states.append(["bar_half_extent_y", env.unwrapped.barDim.flatten()[1]])
+    states.append(["bar_half_extent_z", env.unwrapped.barDim.flatten()[2]])
+
+    # states.append(env.unwrapped.barDim.flatten())
+    states.append(["bar_x","bar_y","bar_z","bar_cos_rot","placeholder","bar_sin_rot","bar_ghost_state","Particles....."])
     while cnt < 500:
 
         act = np.zeros((1, 5))
@@ -179,17 +199,19 @@ if __name__ == '__main__':
         key_pressed = W or A or S or D or CW or CCW or Ghost or skip
         if (key_pressed or not paused):
             env.render()
-            state = env.unwrapped.get_state()
+            state = flex_env.FlexEnv.get_state(env.unwrapped)
 
-            act = generate_manual_action_abs_rot(W, A, S, D, CW, CCW, Ghost, skip, state)
+            act = generate_manual_action_abs_rot(W, A, S, D, CW, CCW, Ghost, skip, obs)
             # print(act)
             act = act[:]/env.unwrapped.action_scale
             obs, rwd, done, info = env.step(act)
+
             ret+=rwd[0]
             all_info.append(info)
-            # state = env.get_full_state()
-            #
-            # states.append(state[0, 4::].flatten())
+
+            s = np.concatenate([state[0,0:2].flatten(),obs[0,8].flatten(),state[0, 4::].flatten()])
+            states.append(s)
+
             cnt += 1
 
             if done:
@@ -206,6 +228,7 @@ if __name__ == '__main__':
                 data_list[key] = []
             data_list[key].append(all_info[i][key])
 
+    
     # total_ret = np.sum(data_list['rwd'])
     # print("Total return of the trajectory is: ", total_ret)
 
@@ -218,12 +241,14 @@ if __name__ == '__main__':
                       label=str(key))
             plot.yscale('symlog')
 
+
     plot.xlabel('Time Steps')
     plot.ylabel('Step Reward')
     plot.legend()
     plot.show()
-    print("Total Return: ",ret)
-    # np.savetxt("sample_data.csv",states,delimiter=",")
+    # print("Total Return: ",ret)
+    # saveListToCsv(states,env.unwrapped.video_path+"/sample_data.csv")
+    # np.savetxt(env.unwrapped.video_path+"/sample_data.csv",states,delimiter=",")
     # env = PlasticSpringReshapingEnvManualControl()
     #
     # obs = env.reset()

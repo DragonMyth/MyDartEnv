@@ -69,7 +69,9 @@ class FlexEnv(gym.Env):
 
         self.save_video = False
 
-        self.video_path = "/home/yzhang/data"
+        # self.video_path = "/home/yzhang/data"
+        self.video_path = "/home/dragonmyth/data"
+
         self.step_cnt = 0
 
     def _seed(self, seed=None):

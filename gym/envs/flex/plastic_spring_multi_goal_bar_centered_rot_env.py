@@ -40,7 +40,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
