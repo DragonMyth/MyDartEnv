@@ -21,7 +21,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        obs_size = self.resolution * self.resolution * 2 + 5
+        obs_size = self.resolution * self.resolution * 2 + 9
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -40,7 +40,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -48,7 +48,10 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 1, 0.01])
-        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+
+        self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
+
+        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
@@ -67,8 +70,10 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
             (self.numInstances, 6 * self.numInitClusters))
 
         self.rolloutCnt = 0
-
         self.ghost = np.ones(self.numInstances)
+        self.stage = np.ones(self.numInstances)
+        self.rolloutRet = np.zeros(self.numInstances)
+        self.currCurriculum =2
 
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -106,26 +111,19 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         expanded_bar_centers = np.expand_dims(prev_state[:, 0], axis=1)
         expanded_bar_centers = np.repeat(expanded_bar_centers, prev_state.shape[1], axis=1)
 
-        prev_distances_center_1_per_part = (np.linalg.norm(
+        prev_distances_center_1_per_part = (10+np.linalg.norm(
             prev_state - expanded_group1_centers, axis=2)[:, 4::])**2
 
-        to_bar_dist_prev = (np.linalg.norm(prev_state - expanded_bar_centers, axis=2)[:, 4::])**2
+        # prev_distances_center_1 = np.sum(prev_distances_center_1_per_part, axis=1)
 
-        outlier_dist_prev = np.zeros(self.numInstances)
-        for i in range(self.numInstances):
-            dist = to_bar_dist_prev[i]
-            maxidx = np.argmax(prev_distances_center_1_per_part[i])
-            # print("Before max id: ",maxidx)
+        # prev_distances_center_1 = np.mean(prev_distances_center_1_per_part, axis=1)
 
-            dist = dist[maxidx]
-            outlier_dist_prev[i] = dist
-
-        prev_distances_center_1 = np.sum(prev_distances_center_1_per_part, axis=1)
+        prev_distances_center_1 = np.max(prev_distances_center_1_per_part, axis=1)
 
         rot_mat = self.angle_to_rot_matrix(action[:, 2])
 
         flex_action = np.zeros((self.numInstances, 5))
-        flex_action[:, -1] = action[:, -1]
+        flex_action[:, -1] = -1
         for i in range(action.shape[0]):
             bar_rot_trans = prev_state[i, 1]
             bar_rot_vec = bar_rot_trans / np.linalg.norm(bar_rot_trans)
@@ -143,56 +141,56 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
             flex_action[i, 2:4] = np.matmul(prev_state[i, 1], rot_mat[i].transpose())
             # action[i, 2:4] = targ_rot_trans
 
-        # flex_action[:,-1] = -1
+    
         done = self.do_simulation(flex_action, self.frame_skip)
 
         curr_state = self.get_state()
 
-        curr_distances_center_1_per_part = (np.linalg.norm(
+        curr_distances_center_1_per_part = (10+np.linalg.norm(
             curr_state - expanded_group1_centers, axis=2)[:, 4::])**2
 
-        curr_distances_center_1 = np.sum(curr_distances_center_1_per_part, axis=1)
+        # curr_distances_center_1 = np.sum(curr_distances_center_1_per_part, axis=1)
+
+        # curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=1)
+
+        # curr_distances_center_1 = np.mean(curr_distances_center_1_per_part, axis=1)
+
+        curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=1)
 
         expanded_bar_centers = np.expand_dims(curr_state[:, 0], axis=1)
         expanded_bar_centers = np.repeat(expanded_bar_centers, curr_state.shape[1], axis=1)
 
         to_bar_dist_curr = (np.linalg.norm(curr_state - expanded_bar_centers, axis=2)[:, 4::])**2
 
-        outlier_dist_curr = np.zeros(self.numInstances)
-        for i in range(self.numInstances):
-            dist = to_bar_dist_curr[i]
-            maxidx = np.argmax(prev_distances_center_1_per_part[i])
-            # print("After max id: ",maxidx)
-            dist = dist[maxidx]
-            outlier_dist_curr[i] = dist
-
-        goal_1_valid_idx = np.where(curr_distances_center_1_per_part < 1)
-        goal_1_cnt = np.bincount(
-            goal_1_valid_idx[0], minlength=self.numInstances)
-
-        obs = self._get_obs()
-        # 1.5
-        goal_1_attract_rwd = 5* (prev_distances_center_1- curr_distances_center_1)
 
         part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-            (curr_state - prev_state), axis=2)[:, 4::] * (curr_distances_center_1_per_part), axis=1) * 10
+            (curr_state - prev_state), axis=2)[:, 4::] , axis=1) * 10
+        target_dist_curr = np.zeros(self.numInstances)
 
-        outlier_attract_rwd = 0.3*(outlier_dist_prev - outlier_dist_curr)
-        # outlier_attract_rwd = -0.01*outlier_dist_curr
-        num_outliers = -0.001 * ((curr_state.shape[1] - 4) - goal_1_cnt) * 5 
-        # print(num_outliers)
-        rewards = goal_1_attract_rwd + \
-                  part_movement_rwd + outlier_attract_rwd + num_outliers
+        for i in range(self.numInstances):
+            dist = to_bar_dist_curr[i]
+            maxidx = np.argmax(curr_distances_center_1_per_part[i])
+            dist = dist[maxidx]
 
+            if(dist<1):
+                self.stage[i] = 1
+                target_dist_curr[i] = 0.3+20*(prev_distances_center_1[i]-curr_distances_center_1[i]) + part_movement_rwd[i]
+            else:
+                self.stage[i] = 0
+                target_dist_curr[i] = -0.1*dist
+            
+        obs = self._get_obs()
+
+        rewards =target_dist_curr
+
+        self.rolloutRet+=rewards
         info = {
-            # 'Total Reward': rewards[0],
-            'Goal 1 Attract': goal_1_attract_rwd[0],
-            'Outliers Rwd': outlier_attract_rwd[0],
-            'Outlier Num Penn': num_outliers[0],
-            'Particle_Movement': part_movement_rwd[0],
+            'Total Reward': rewards[0],
+
         }
 
         return obs, rewards, done, info
+
 
     def _get_obs(self):
 
@@ -201,6 +199,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
         for i in range(self.numInstances):
             ghost = self.ghost[i]
+            stage = self.stage[i]
             state = states[i]
             part_state = state[4::]
 
@@ -236,7 +235,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
             density_goal = self.get_goal_gradient(np.array([[-1.8,-1.8]]), bar_state, bar_rot)
             # bar_state[0:2]*=0
             obs = np.concatenate(
-                [bar_state[2:].flatten(), [ghost], density.flatten(), goal_gradient.flatten()
+                [bar_state[:].flatten(), [stage], density.flatten(), goal_gradient.flatten()
                  ])
 
             obs_list.append(obs)
@@ -298,7 +297,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         y_pos = particles_trans[:, 1]
         if normalized:
             # H = H ** (1.0 / 2)
-            H = H / 150
+            H = H / (200)
             H = np.clip(H, 0, 1)
         return H
 
@@ -307,12 +306,28 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         return full_state[:, :, (0, 2)]
 
     def _reset(self):
+
+        if(np.mean(self.rolloutRet) > 400):
+            self.currCurriculum=min(3,self.currCurriculum+1)
+            
+        
+        print("Current Curriculum Level: ", self.currCurriculum)     
+        print("Current Cluster Number Level: ", self.numInitClusters)         
+        print("Return at current rollout: ", self.rolloutRet)            
+        print("Mean Return at current rollout: ", np.mean(self.rolloutRet))            
+
+        # self.randGoalRange = 2+2*min(3,self.currCurriculum)
+        self.numInitClusters = 1+self.currCurriculum
+        self.rolloutRet = np.zeros(self.numInstances)
         if self.randomCluster:
             # self.idxPool = np.array([[-1, -1],[1, 1],[1, -1],[-1, 1]])
-            self.idxPool = np.array([[-1, -1]])
+            # self.idxPool = np.array([[-1, -1]])
 
-            # self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
-            #     self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
+            # self.idxPool = np.array([[0,0]])
+
+            self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
+                self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
+
             # Pre-flex reset calculation
             self.initClusterparam = np.zeros(
                 (self.numInstances, 6 * self.numInitClusters))
@@ -338,6 +353,8 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         for i in range(self.numInstances):
             self.circle_center[i] = np.random.choice(self.randGoalRange, size=2, replace=False)
 
+        self.circle_center[:,0] = np.arange(self.numInstances)%self.randGoalRange
+
         self.circle_center = self.circle_center.astype(int)
 
         self.circle_center[:, 1] = self.circle_center[:, 0]
@@ -347,13 +364,13 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.set_goal(goals)
         self.setMapHalfExtent(self.mapHalfExtent)
         #
-        # pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 2))
+        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 2))
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 1))
 
-        pos = np.zeros((self.numInstances, 2))
-        pos[:, 0] = -1.8
-        pos[:, 1] = -1.8
-        rot = np.zeros((self.numInstances,1))
+        # pos = np.zeros((self.numInstances, 2))
+        # pos[:, 0] = -1.8
+        # pos[:, 1] = -1.8
+        # rot = np.zeros((self.numInstances,1))
         #rot[:,0] = np.pi/4
 
         #if self.rolloutCnt < 200:
@@ -412,10 +429,10 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         ll = surfaces[2]
         lr = surfaces[3]
 
-        part_map = obs[0, 4:4 + self.resolution * self.resolution]
-        goal_map = obs[0, 4 + self.resolution * self.resolution:4 +
+        part_map = obs[0, 9:9 + self.resolution * self.resolution]
+        goal_map = obs[0, 9 + self.resolution * self.resolution:9 +
                                                                 2 * (self.resolution * self.resolution)]
-        particle_goal_map = obs[0, 4 + 2*self.resolution * self.resolution:4 +3 * (self.resolution * self.resolution)]
+        particle_goal_map = obs[0, 9 + 2*self.resolution * self.resolution:9 +3 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
 
@@ -453,8 +470,8 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
     
-        part_map = obs[0, 4:4 + self.resolution * self.resolution]
-        goal_map = obs[0, 4 + self.resolution * self.resolution:4 +
+        part_map = obs[0, 9:9 + self.resolution * self.resolution]
+        goal_map = obs[0, 9 + self.resolution * self.resolution:9 +
                        2 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
