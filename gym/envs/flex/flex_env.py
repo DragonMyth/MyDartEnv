@@ -69,8 +69,8 @@ class FlexEnv(gym.Env):
 
         self.save_video = False
 
-        # self.video_path = "/home/yzhang/data"
-        self.video_path = "/home/dragonmyth/data"
+        self.video_path = "/home/yzhang/data"
+        # self.video_path = "/home/dragonmyth/data"
 
         self.step_cnt = 0
 
@@ -137,7 +137,8 @@ class FlexEnv(gym.Env):
         pyFlex.setInitClusterParam(clusterParam)
     def get_density(self,particles,resolution,width,mapHalfExtent):
         return pyFlex.getParticleDensity(particles, resolution,width,mapHalfExtent)
-
+    def get_height_map(self,particles,heights,resolution,width,mapHalfExtent):
+        return pyFlex.getParticleHeightMap(particles,heights,resolution,width,mapHalfExtent)
     def _render(self, mode='human', close=False):
         if(self.viewerId==2):
             # pg.display.update()

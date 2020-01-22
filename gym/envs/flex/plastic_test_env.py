@@ -9,7 +9,8 @@ import itertools
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
-
+from sklearn.decomposition import PCA
+from scipy.spatial.distance import cdist
 try:
     import bindings as pyFlex
 except ImportError as e:
@@ -21,7 +22,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        obs_size = self.resolution * self.resolution * 1 + 13
+        self.direct_info_dim = 11
+        obs_size = self.resolution * self.resolution * 2 + 11
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -31,14 +33,14 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5, 2, 5])
-        action_bound = np.array([[-7, -3,-7, -np.pi / 2], [
-            7,3, 7 ,np.pi / 2]])
+        self.clusterDim = np.array([6,6,6])
+        action_bound = np.array([[-7, -20,-7, -np.pi / 2], [
+            7,20, 7 ,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -59,7 +61,9 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum =0
         self.rwdBuffer=[0 for _ in range(100)]
-
+        self.pca = PCA(1)
+        self.curr_pc = np.array([[1.0,1.0],[-1.0,-1.0]])
+        print("With Height Map Attraction")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
         # rand_rot_ang = np.ones(self.numInstances)
@@ -84,8 +88,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
     def _step(self, action):
         action = action * self.action_scale
-
-        prev_bar_state,prev_part_state = self.get_state()
+        prev_bar_state,prev_part_state,prev_part_heights = self.get_state()
 
         rot_mat = self.angle_to_rot_matrix(action[:, 3])
 
@@ -109,65 +112,122 @@ class PlasticTestEnv(flex_env.FlexEnv):
             transformed_action[i, 3:5] = np.matmul(prev_bar_state[i, 1,(0,2)], rot_mat[i].transpose())
 
         flex_action = np.zeros((self.numInstances,6))
-        # flex_action[:,0] = transformed_action[:,0]
-        # flex_action[:,1] = transformed_action[:,1]
-        # flex_action[:,2] = transformed_action[:,2]
-        # flex_action[:,3] = transformed_action[:,3]
-        # flex_action[:,4] = transformed_action[:,4]
-        # flex_action[:,5] = -1
-        flex_action[:,0] = 0
-        flex_action[:,1] = 0
-        flex_action[:,2] = 0
-        flex_action[:,3] = 1
-        flex_action[:,4] = 0
-        flex_action[:,5] = -1
-        prev_obs = self._get_obs()
+        flex_action[:,0] = transformed_action[:,0]
 
+        flex_action[:,1] = action[:,1]
+        
+
+        flex_action[:,2] = transformed_action[:,2]
+        flex_action[:,3] = transformed_action[:,3]
+        flex_action[:,4] = transformed_action[:,4]
+        flex_action[:,5] = -1
+       
+        prev_obs = self._get_obs()
+        prev_untransformed_density = np.zeros((self.numInstances,self.resolution*self.resolution))
+        
+
+        prev_pair_wise_dist = np.zeros(self.numInstances)
+        for i in range(self.numInstances):
+            part_state = prev_part_state[i] 
+            filtered_parts = part_state[(part_state[:,0]>-self.mapHalfExtent) & (part_state[:,0]<self.mapHalfExtent)&(part_state[:,1]>-self.mapHalfExtent)&(part_state[:,1]<self.mapHalfExtent)]
+
+            density = self.get_particle_density(
+                filtered_parts, np.array([[0,0,0]]), np.identity (2), normalized=True)
+
+
+            prev_untransformed_density[i] = density.flatten()
+
+        prev_height_sum = (1+np.sum(prev_part_heights,axis=1))**2
+        #Simulation 
         done = self.do_simulation(flex_action, self.frame_skip)
 
-        curr_bar_state,curr_part_state = self.get_state()
+        curr_bar_state,curr_part_state,curr_part_heights = self.get_state()
 
         obs = self._get_obs()
 
-        maxFlatIdx = np.argmax(obs[:,13::],axis=1)
+        untransformed_density = np.zeros((self.numInstances,self.resolution*self.resolution))
+        untransformed_height = np.zeros((self.numInstances,self.resolution*self.resolution))
+
+        for i in range(self.numInstances):
+            part_state = curr_part_state[i]
+            
+
+            filtered_parts = part_state[(part_state[:,0]>-self.mapHalfExtent) & (part_state[:,0]<self.mapHalfExtent)&(part_state[:,1]>-self.mapHalfExtent)&(part_state[:,1]<self.mapHalfExtent)]
+
+            density = self.get_particle_density(
+                filtered_parts, np.array([[0,0,0]]), np.identity (2), normalized=True)
+            
+            height = self.get_mean_height_map(filtered_parts,np.array([[0,0,0]]), np.identity (2),curr_part_heights[i])
+            # if(i==0):
+            #     import matplotlib.pyplot as plt
+            #     plt.imshow(height)
+            #     plt.show()
+            untransformed_density[i] = density.flatten()
+            untransformed_height[i] = height.flatten()
+
+        maxFlatIdx = np.argmax(untransformed_height,axis=1)
         maxI = (maxFlatIdx/self.resolution).astype(int)
         maxJ = maxFlatIdx-self.resolution*maxI
 
         posX = np.expand_dims((maxJ+0.5)/self.resolution*self.mapHalfExtent*2-self.mapHalfExtent,axis=1)
         posY = np.expand_dims((maxI+0.5)/self.resolution*self.mapHalfExtent*2-self.mapHalfExtent,axis=1)
 
-        densePos = np.concatenate([posX,np.zeros((self.numInstances,1)),posY],axis=1)
+        densePos = np.concatenate([posX,posY],axis=1)
+        # transformed_densePos = np.matmul()
+        to_bar_dist_curr = (np.linalg.norm(densePos - curr_bar_state[:,0,(0,2)], axis=1))**2
 
-        to_bar_dist_curr = (np.linalg.norm(densePos - curr_bar_state[:,0], axis=1))**2
+        # curr_filtered_density = obs[:,self.direct_info_dim:self.direct_info_dim+self.resolution*self.resolution]-density_attention_filter.flatten()[np.newaxis,:]        
+        # curr_filtered_density = np.clip(curr_filtered_density,0,1)
 
-        part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1) * 10
-        target_dist_curr = np.zeros(self.numInstances)
-
-        target_dist_curr = - 0.1*to_bar_dist_curr
+        part_movement_rwd =  np.mean(np.linalg.norm(
+            (curr_part_state - prev_part_state), axis=2), axis=1) 
         
-        rewards =target_dist_curr
+        
+        curr_height_sum = (1+np.sum(curr_part_heights,axis=1))**2
 
+        # print(curr_height_sum)
+        target_dist_curr = np.zeros(self.numInstances)
+        # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
+        for i in range(self.numInstances):
+            dist= to_bar_dist_curr[i]
+            if(dist<=1):
+                self.stage[i]  =  0
+                target_dist_curr[i] = 1-0.9*np.clip(np.exp(-0.1*(prev_height_sum[i]-curr_height_sum[i])),0,1)-0.1*np.exp(-part_movement_rwd[i])
+
+            else:
+                self.stage[i]  =  1
+                target_dist_curr[i] = -0.1*np.exp(0.02*(dist-1))
+
+        # target_dist_curr[i] = 0.1+0.01*((curr_max_density[i]) - (prev_max_density[i]))#+15*part_movement_rwd[i]
+
+        # target_dist_curr = 0.1+0.1*(curr_pair_wise_dist-prev_pair_wise_dist)+10*part_movement_rwd
+
+        # target_dist_curr = 0.1+0.1*(curr_pair_wise_dist-100)+10*part_movement_rwd
+
+        rewards =1-0.9*np.clip(np.exp(-0.1*(prev_height_sum-curr_height_sum)),0,1)-0.1*np.exp(-part_movement_rwd)
+
+        # print(self.stage[0])
         self.rolloutRet+=rewards
         info = {
             'Total Reward': rewards[0],
 
         }
         if(len(self.rwdBuffer)>=100):
-            self.rwdBuffer.remove(0)
+            self.rwdBuffer.pop(0)
         self.rwdBuffer.append(rewards[0])
         return obs, rewards, done, info
 
 
     def _get_obs(self):
 
-        bar_states,part_states = self.get_state()
+        bar_states,part_states,part_heights = self.get_state()
         obs_list = []
 
         for i in range(self.numInstances):
             stage = self.stage[i]
             part_state = part_states[i]
-
+            part_state = part_state[(part_state[:,0]>-self.mapHalfExtent) & (part_state[:,0]<self.mapHalfExtent)&(part_state[:,1]>-self.mapHalfExtent)&(part_state[:,1]<self.mapHalfExtent)]
+            part_height = part_heights[i]
             bar_state = bar_states[i]
 
             bar_rot_vec = bar_state[1,(0,2)] / np.linalg.norm(bar_state[1,(0,2)])
@@ -181,10 +241,17 @@ class PlasticTestEnv(flex_env.FlexEnv):
             density = self.get_particle_density(
                 part_state, bar_state, bar_rot, normalized=True)
 
-            # bar_state[0:2]*=0
+            height_map = self.get_mean_height_map(part_state,bar_state,bar_rot,part_height)
+            
+            # if(i==0):
+            #     import matplotlib.pyplot as plt
+            #     plt.figure()
+            #     plt.imshow(height_map)
+            #     plt.show()
             obs = np.concatenate(
-                [bar_state[:].flatten(), [stage], density.flatten()
+                [bar_state[(0,2),:].flatten(),bar_state[1,(0,2)].flatten(),bar_state[3,(0,2)].flatten() ,[stage], density.flatten(),height_map.flatten()
                  ])
+            
             obs_list.append(obs)
 
         return np.array(obs_list)
@@ -232,28 +299,52 @@ class PlasticTestEnv(flex_env.FlexEnv):
         H = np.clip(H, 0, 1)
         return H
 
-    def get_particle_density(self, particles, bar_state, global_rot, normalized=True):
+    def get_particle_density(self, particles, bar_state, global_rot, normalized=True,width=2.5):
+        if(particles.shape[0] == 0):
+            return np.zeros((self.resolution,self.resolution))
         particles -= bar_state[0,(0,2)]
 
-        # particles_trans = np.matmul(particles, global_rot.transpose())
+        particles = np.matmul(particles, global_rot.transpose())
 
         particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
+        # H = self.get_density(particles, self.resolution,
+        #                      2.5, self.mapHalfExtent)
         H = self.get_density(particles, self.resolution,
-                             2.5, self.mapHalfExtent)
+                        width, self.mapHalfExtent)
         x_pos = particles[:, 0]
         y_pos = particles[:, 1]
         if normalized:
             # H = H ** (1.0 / 2)
             H = H / (200)
+            # H = H / (50)
+
             H = np.clip(H, 0, 1)
         return H
+    def get_mean_height_map(self,particles,bar_state,rot,heights, normalized=True,width=2.5):
+        if(particles.shape[0] == 0):
+            return np.zeros((self.resolution,self.resolution))
+        particles -= bar_state[0,(0,2)]
 
+        particles = np.matmul(particles, rot.transpose())
+
+        particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
+        # H = self.get_density(particles, self.resolution,
+        #                      2.5, self.mapHalfExtent)
+        H = self.get_height_map(particles,heights,self.resolution,width,self.mapHalfExtent)
+        # print(np.max(H))
+        # if normalized:
+            # H = H ** (1.0 / 2)
+            # H = H / (10)
+            # H = H / (50)
+
+            # H = np.clip(H, 0, 1)
+        return H
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
         part_state = full_state[:,4::,(0,2)]
         bar_state = full_state[:,:4,:]
-
-        return bar_state,part_state
+        part_heights = full_state[:,4::,1]
+        return bar_state,part_state,part_heights
 
     def _reset(self):
         self.rwdBuffer=[0 for _ in range(100)]
@@ -268,10 +359,10 @@ class PlasticTestEnv(flex_env.FlexEnv):
         print("Mean Return at current rollout: ", np.mean(self.rolloutRet))            
 
         # self.randGoalRange = 2+2*min(3,self.currCurriculum)
-        self.numInitClusters = 1+self.currCurriculum
+        # self.numInitClusters = 1+self.currCurriculum
         self.rolloutRet = np.zeros(self.numInstances)
         if self.randomCluster:
-            # self.idxPool = np.array([[-1, -1],[1, 1],[1, -1],[-1, 1]])
+            # self.idxPool = np.array([[-1, -1],[1, 1]])
             # self.idxPool = np.array([[-1, -1]])
 
             self.idxPool = np.array([[0,0]])
@@ -290,7 +381,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
                 for j in range(self.numInitClusters):
                     self.initClusterparam[i, (j * 6, j * 6 + 2)
-                    ] = self.idxPool[indices[j]] * 1.8
+                    ] = self.idxPool[indices[j]] * 2.5
                     self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
 
                 self.setInitClusterParam(self.initClusterparam)
@@ -306,6 +397,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.setMapHalfExtent(self.mapHalfExtent)
         #
         pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 2))
+        pos_y = np.random.uniform(0,1,(self.numInstances,1))
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 1))
 
         # pos = np.zeros((self.numInstances, 2))
@@ -314,20 +406,12 @@ class PlasticTestEnv(flex_env.FlexEnv):
         # rot = np.zeros((self.numInstances,1))
         #rot[:,0] = np.pi/4
 
-        #if self.rolloutCnt < 200:
-        #    trans_pert = np.random.uniform(-2, 2, (self.numInstances, 2)) * self.rolloutCnt / 200.0
-        #    pos = np.clip(pos + trans_pert, -self.mapHalfExtent, self.mapHalfExtent)
-        #else:
-        #    pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 2))
 
-        # pos = np.random.uniform(-0.0,0.0,(self.numInstances,2))
-        # rot = np.random.uniform(-0.1*np.pi,0.1*np.pi,(self.numInstances,1))
-
-        vel = np.zeros((self.numInstances, 2))
-        angVel = np.zeros((self.numInstances, 1))
+        vel = np.random.uniform(-1, 1, (self.numInstances, 3))
+        angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 1))
         barDim = np.tile(self.barDim, (self.numInstances, 1))
 
-        controllers = np.concatenate([pos, rot, vel, angVel, barDim], axis=1)
+        controllers = np.concatenate([pos[:,0][:,np.newaxis],pos_y,pos[:,1][:,np.newaxis], rot, vel, angVel, barDim], axis=1)
         self.set_controller(controllers)
         self.rolloutCnt += 1
         return self._get_obs()
@@ -411,15 +495,20 @@ class PlasticTestEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
     
-        part_map = obs[0, 13:13 + self.resolution * self.resolution]
+        part_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
        
         part_map = np.reshape(
             part_map, (self.resolution, self.resolution)).astype(np.float64)
-    
+
+        height_map =  obs[0, self.direct_info_dim + self.resolution * self.resolution:self.direct_info_dim + 2*self.resolution * self.resolution]
+        height_map = np.reshape(
+            height_map, (self.resolution, self.resolution)).astype(np.float64)
         # self.draw_grid(tl, bar_map, 0, 1)
         self.live_rwd(tl,self.rwdBuffer)
         # self.draw_grid(tr, goal_map, 0, 1)
-    
+        # self.live_pc(ll,self.curr_pc)
+        self.draw_grid(ll, height_map, 0, 1)
+
         self.draw_grid(lr, part_map, 0, 1)
         #
         self.screen.blit(tl, (0, 0))
@@ -444,7 +533,18 @@ class PlasticTestEnv(flex_env.FlexEnv):
             y1 = height/2-np.tanh(rwds[i+1])*(height/2)
             color = 255* np.array([1,0,0])
             pg.draw.line(surface,color,(x0,y0),(x1,y1),1)
+    def live_pc(self,surface,pc):
+        width = surface.get_width()
+        height = surface.get_height()
+        color = 255*np.array([1,0,0])
+        x0 = (pc[0,0]+self.mapHalfExtent)/(2*self.mapHalfExtent)*width
+        y0 = (pc[0,1]+self.mapHalfExtent)/(2*self.mapHalfExtent)*height
 
+        x1 = (pc[1,0]+self.mapHalfExtent)/(2*self.mapHalfExtent)*width
+        y1 = (pc[1,1]+self.mapHalfExtent)/(2*self.mapHalfExtent)*height
+
+        # print(x0,y0,x1,y1)
+        pg.draw.line(surface,color,(x0,y0),(x1,y1),3)
     def draw_grid(self, surface, data, min, scale):
         data = (data - min) / scale
         w_gap = surface.get_width() / data.shape[0]
@@ -490,11 +590,11 @@ if __name__ == '__main__':
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 4))
+        act = np.zeros((1, 4))
         # act[:, 0]=-1
-        # act[:, 1] = -1
-        # act[:, 2] = 1
-        # act[:, 3] =- 1
+        # act[:, 1] = 1
+        act[:, 2] = 1
+        # act[:, 3] = 1
 
         # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)

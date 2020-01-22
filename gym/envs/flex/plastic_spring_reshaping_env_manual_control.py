@@ -119,6 +119,59 @@ def generate_manual_action_abs_rot(w, a, s, d, cw, ccw, ghost, skip, obs):
     # print(act)
     return act
 
+def generate_manual_action_rel_rot_vert(w, a, s, d, cw, ccw, up,down, skip, obs):
+    bar_state = obs[0, 0:4]
+
+    act = np.zeros((1, 4))
+
+    linear_scale = 2
+    ang_scale = 0.3 * np.pi
+    linear_relative_target = np.zeros(3)
+
+    target_angle =0# np.arctan2(bar_state[1,1],bar_state[1,0])
+    ghost_cont = 0
+    if w:
+        linear_relative_target += (np.array([0, 0,-1]) * linear_scale)
+
+    if s:
+        linear_relative_target += (np.array([0, 0,1]) * linear_scale)
+
+    if a:
+        linear_relative_target += (np.array([-1,0, 0]) * linear_scale)
+    if d:
+        linear_relative_target += (np.array([1,0, 0]) * linear_scale)
+    if up:
+        linear_relative_target += (np.array([0,1, 0]) * linear_scale)
+    if down:
+        linear_relative_target += (np.array([0,-1, 0]) * linear_scale)
+
+    if ccw:
+        target_angle += 1 * ang_scale
+    if cw:
+        target_angle += -1 * ang_scale
+    if not skip:
+        rot_vec = np.ones((2, 2))
+
+        rot_vec[0, 0] = np.cos(target_angle)
+        rot_vec[0, 1] = -np.sin(target_angle)
+        rot_vec[1, 0] = np.sin(target_angle)
+        rot_vec[1, 1] = np.cos(target_angle)
+
+        rot_vec = np.matmul(bar_state[2:4].transpose(), rot_vec.transpose()).transpose()
+        # print(rot_vec)
+        act[0, 0:3] =  linear_relative_target+np.array([0,bar_state[1],0])
+        act[0, 3] = target_angle
+
+    else:
+        # act[0, 0:4] = bar_state
+        # act[0, 4] = 0
+        pass
+
+    # act = np.array([[0.52088761, -2.95443344, 1, 0, 0]])
+    # act = np.array([[1,0 ,1, 0, 0]])
+
+    # print(act)
+    return act
 
 def saveListToCsv(data,filename):
     import csv
@@ -132,11 +185,12 @@ if __name__ == '__main__':
     import gym
     env = gym.make("FlexPlasticReshaping-v0")
 
-    env.save_video = True
-    env.video_path = 'manual_control_data'
+    env.unwrapped.save_video = True
+    env.unwrapped.video_path = 'manual_control_data'
     import os
-
+    print(env.unwrapped.video_path)
     if not os.path.exists(env.unwrapped.video_path):
+        
         os.makedirs(env.unwrapped.video_path)
 
     obs = env.reset()
@@ -148,14 +202,14 @@ if __name__ == '__main__':
 
     states = []
     # bar_states = []
-    states.append(["Number of Goals ", len(env.unwrapped.center_list)])
-    states.append(["Goals "]+list((env.unwrapped.center_list).flatten()))
-    states.append(["bar_half_extent_x", env.unwrapped.barDim.flatten()[0]])
-    states.append(["bar_half_extent_y", env.unwrapped.barDim.flatten()[1]])
-    states.append(["bar_half_extent_z", env.unwrapped.barDim.flatten()[2]])
+    # states.append(["Number of Goals ", len(env.unwrapped.center_list)])
+    # states.append(["Goals "]+list((env.unwrapped.center_list).flatten()))
+    # states.append(["bar_half_extent_x", env.unwrapped.barDim.flatten()[0]])
+    # states.append(["bar_half_extent_y", env.unwrapped.barDim.flatten()[1]])
+    # states.append(["bar_half_extent_z", env.unwrapped.barDim.flatten()[2]])
 
     # states.append(env.unwrapped.barDim.flatten())
-    states.append(["bar_x","bar_y","bar_z","bar_cos_rot","placeholder","bar_sin_rot","bar_ghost_state","Particles....."])
+    # states.append(["bar_x","bar_y","bar_z","bar_cos_rot","placeholder","bar_sin_rot","bar_ghost_state","Particles....."])
     while cnt < 500:
 
         act = np.zeros((1, 5))
@@ -168,6 +222,8 @@ if __name__ == '__main__':
         D = False
         CW = False
         CCW = False
+        Up = False
+        Down = False
         Ghost = False
         skip = False
         keys = pg.key.get_pressed()
@@ -195,13 +251,15 @@ if __name__ == '__main__':
             skip = True
 
         if keys[pg.K_LSHIFT]:
-            Ghost = True
-        key_pressed = W or A or S or D or CW or CCW or Ghost or skip
+            Up = True
+        if keys[pg.K_LCTRL]:
+            Down = True
+        key_pressed = W or A or S or D or CW or CCW or Up or Down or skip
         if (key_pressed or not paused):
             env.render()
             state = flex_env.FlexEnv.get_state(env.unwrapped)
 
-            act = generate_manual_action_abs_rot(W, A, S, D, CW, CCW, Ghost, skip, obs)
+            act = generate_manual_action_rel_rot_vert(W, A, S, D, CW, CCW, Up,Down, skip, obs)
             # print(act)
             act = act[:]/env.unwrapped.action_scale
             obs, rwd, done, info = env.step(act)
@@ -246,7 +304,7 @@ if __name__ == '__main__':
     plot.ylabel('Step Reward')
     plot.legend()
     plot.show()
-    # print("Total Return: ",ret)
+    print("Total Return: ",ret)
     # saveListToCsv(states,env.unwrapped.video_path+"/sample_data.csv")
     # np.savetxt(env.unwrapped.video_path+"/sample_data.csv",states,delimiter=",")
     # env = PlasticSpringReshapingEnvManualControl()

@@ -677,6 +677,12 @@ register(
     max_episode_steps=500,
 )
 
+register(
+    id='FlexPlasticReshaping-v8',
+    entry_point='gym.envs.flex:PlasticSpreadingRotHeightEnv',
+    max_episode_steps=500,
+)
+
 
 #
 #
