@@ -137,7 +137,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
             prev_untransformed_density[i] = density.flatten()
 
-        prev_height_sum = (1+np.sum(prev_part_heights,axis=1))**2
+        prev_height_sum = (np.sum(prev_part_heights,axis=1))
         #Simulation 
         done = self.do_simulation(flex_action, self.frame_skip)
 
@@ -183,20 +183,20 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
             (curr_part_state - prev_part_state), axis=2), axis=1) 
         
         
-        curr_height_sum = (1+np.sum(curr_part_heights,axis=1))**2
+        curr_height_sum = (np.sum(curr_part_heights,axis=1))
 
         # print(curr_height_sum)
         target_dist_curr = np.zeros(self.numInstances)
         # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
         for i in range(self.numInstances):
             dist= to_bar_dist_curr[i]
-            if(dist<=1):
+            if(dist<=2):
                 self.stage[i]  =  0
-                target_dist_curr[i] = 1-0.9*np.clip(np.exp(-0.1*(prev_height_sum[i]-curr_height_sum[i])),0,1)-0.1*np.exp(-part_movement_rwd[i])
+                target_dist_curr[i] = 0.9*np.clip(np.exp(0.01*(-curr_height_sum[i])),0,1)+0.1*(1-np.exp(-20*part_movement_rwd[i]))
 
             else:
                 self.stage[i]  =  1
-                target_dist_curr[i] = -0.1*np.exp(0.02*(dist-1))
+                target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
 
         # target_dist_curr[i] = 0.1+0.01*((curr_max_density[i]) - (prev_max_density[i]))#+15*part_movement_rwd[i]
 
@@ -205,6 +205,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         # target_dist_curr = 0.1+0.1*(curr_pair_wise_dist-100)+10*part_movement_rwd
 
         rewards =target_dist_curr
+
         # print(self.stage[0])
         self.rolloutRet+=rewards
         info = {
