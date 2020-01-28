@@ -23,7 +23,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
         self.resolution = 32
         self.direct_info_dim = 11
-        obs_size = self.resolution * self.resolution * 2 + 11
+        obs_size = self.resolution * self.resolution * 2 + self.direct_info_dim
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -60,9 +60,10 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum =0
-        self.rwdBuffer=[0 for _ in range(100)]
+        self.rwdBuffer=[[0,0,0] for _ in range(100)]
         self.pca = PCA(1)
         self.curr_pc = np.array([[1.0,1.0],[-1.0,-1.0]])
+        self.good_height = 0.2
         print("With Height Map Attraction")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -114,8 +115,9 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         flex_action = np.zeros((self.numInstances,6))
         flex_action[:,0] = transformed_action[:,0]
 
-        flex_action[:,1] = action[:,1]
+        # flex_action[:,1] = action[:,1]
         
+        flex_action[:,1] = self.good_height
 
         flex_action[:,2] = transformed_action[:,2]
         flex_action[:,3] = transformed_action[:,3]
@@ -123,21 +125,8 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         flex_action[:,5] = -1
        
         prev_obs = self._get_obs()
-        prev_untransformed_density = np.zeros((self.numInstances,self.resolution*self.resolution))
-        
-
-        prev_pair_wise_dist = np.zeros(self.numInstances)
-        for i in range(self.numInstances):
-            part_state = prev_part_state[i] 
-            filtered_parts = part_state[(part_state[:,0]>-self.mapHalfExtent) & (part_state[:,0]<self.mapHalfExtent)&(part_state[:,1]>-self.mapHalfExtent)&(part_state[:,1]<self.mapHalfExtent)]
-
-            density = self.get_particle_density(
-                filtered_parts, np.array([[0,0,0]]), np.identity (2), normalized=True)
 
 
-            prev_untransformed_density[i] = density.flatten()
-
-        prev_height_sum = (np.sum(prev_part_heights,axis=1))
         #Simulation 
         done = self.do_simulation(flex_action, self.frame_skip)
 
@@ -158,10 +147,6 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
                 filtered_parts, np.array([[0,0,0]]), np.identity (2), normalized=True)
             
             height = self.get_mean_height_map(filtered_parts,np.array([[0,0,0]]), np.identity (2),curr_part_heights[i])
-            # if(i==0):
-            #     import matplotlib.pyplot as plt
-            #     plt.imshow(height)
-            #     plt.show()
             untransformed_density[i] = density.flatten()
             untransformed_height[i] = height.flatten()
 
@@ -176,35 +161,29 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         # transformed_densePos = np.matmul()
         to_bar_dist_curr = (np.linalg.norm(densePos - curr_bar_state[:,0,(0,2)], axis=1))**2
 
-        # curr_filtered_density = obs[:,self.direct_info_dim:self.direct_info_dim+self.resolution*self.resolution]-density_attention_filter.flatten()[np.newaxis,:]        
-        # curr_filtered_density = np.clip(curr_filtered_density,0,1)
-
         part_movement_rwd =  np.mean(np.linalg.norm(
             (curr_part_state - prev_part_state), axis=2), axis=1) 
+        part_movement_rwd = (1-np.exp(-40*part_movement_rwd))
         
-        
-        curr_height_sum = (np.sum(curr_part_heights,axis=1))
+        curr_height_sum = (np.max(curr_part_heights,axis=1))
 
-        # print(curr_height_sum)
+        # print(1-np.exp(-40*part_movement_rwd))
         target_dist_curr = np.zeros(self.numInstances)
         # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
-        for i in range(self.numInstances):
-            dist= to_bar_dist_curr[i]
-            if(dist<=2):
-                self.stage[i]  =  0
-                target_dist_curr[i] = 0.9*np.clip(np.exp(0.01*(-curr_height_sum[i])),0,1)+0.1*(1-np.exp(-20*part_movement_rwd[i]))
+        # for i in range(self.numInstances):
+        #     dist= to_bar_dist_curr[i]
+        #     if(dist<=2):
+        #         self.stage[i]  =  0
+        #         target_dist_curr[i] = 0.4*np.clip(np.exp(3*(-curr_height_sum[i])),0,1)+0.6*(1-np.exp(-40*part_movement_rwd[i]))
 
-            else:
-                self.stage[i]  =  1
-                target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
+        #     else:
+        #         self.stage[i]  =  1
+        #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
 
-        # target_dist_curr[i] = 0.1+0.01*((curr_max_density[i]) - (prev_max_density[i]))#+15*part_movement_rwd[i]
 
-        # target_dist_curr = 0.1+0.1*(curr_pair_wise_dist-prev_pair_wise_dist)+10*part_movement_rwd
-
-        # target_dist_curr = 0.1+0.1*(curr_pair_wise_dist-100)+10*part_movement_rwd
-
-        rewards =target_dist_curr
+        
+        height_min_rwd = np.clip(np.exp(3*(-curr_height_sum)),0,1)
+        rewards =0.4*height_min_rwd+0.6*part_movement_rwd
 
         # print(self.stage[0])
         self.rolloutRet+=rewards
@@ -212,9 +191,11 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
             'Total Reward': rewards[0],
 
         }
+        reward_decomp = [rewards[0],0.4*height_min_rwd[0],0.6*part_movement_rwd[0]]
         if(len(self.rwdBuffer)>=100):
             self.rwdBuffer.pop(0)
-        self.rwdBuffer.append(rewards[0])
+        self.rwdBuffer.append(reward_decomp)
+
         return obs, rewards, done, info
 
 
@@ -347,7 +328,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         return bar_state,part_state,part_heights
 
     def _reset(self):
-        self.rwdBuffer=[0 for _ in range(100)]
+        self.rwdBuffer=[[0,0,0] for _ in range(100)]
 
         if(np.mean(self.rolloutRet) > 400):
             self.currCurriculum=min(3,self.currCurriculum+1)
@@ -397,7 +378,9 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         self.setMapHalfExtent(self.mapHalfExtent)
         #
         pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 2))
-        pos_y = np.random.uniform(0,1,(self.numInstances,1))
+        pos_y = np.ones((self.numInstances,1))*self.good_height
+        # pos_y = np.random.uniform(0,1,(self.numInstances,1))
+
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 1))
 
         # pos = np.zeros((self.numInstances, 2))
@@ -408,6 +391,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
 
         vel = np.random.uniform(-1, 1, (self.numInstances, 3))
+        vel[:,1] = 0
         angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 1))
         barDim = np.tile(self.barDim, (self.numInstances, 1))
 
@@ -524,15 +508,25 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
     def live_rwd(self,surface,rwds):
         width = surface.get_width()
         height = surface.get_height()
+        print(len(rwds[0]))
+        rwds = np.array(rwds)
+        for j in range(rwds.shape[1]):
+            rwd = rwds[:,j]
+            # print(rwd)
+            for i in range(len(rwd)-1):
+                x0 = i/float(len(rwd))*width
+                y0 = height/2-(rwd[i])*(height/2)
 
-        for i in range(len(rwds)-1):
-            x0 = i/float(len(rwds))*width
-            y0 = height/2-np.tanh(rwds[i])*(height/2)
+                x1 = (i+1)/float(len(rwd))*width
+                y1 = height/2-(rwd[i+1])*(height/2)
 
-            x1 = (i+1)/float(len(rwds))*width
-            y1 = height/2-np.tanh(rwds[i+1])*(height/2)
-            color = 255* np.array([1,0,0])
-            pg.draw.line(surface,color,(x0,y0),(x1,y1),1)
+                if j ==0:
+                    color = 255* np.array([1,0,0])
+                elif j==1:
+                    color = 255* np.array([0,1,0])
+                else:
+                    color = 255* np.array([0,0,1])
+                pg.draw.line(surface,color,(x0,y0),(x1,y1),1)
     def live_pc(self,surface,pc):
         width = surface.get_width()
         height = surface.get_height()

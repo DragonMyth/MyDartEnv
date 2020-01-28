@@ -19,3 +19,5 @@ from gym.envs.flex.granular_two_goals_env import GranularTwoGoalsEnv
 from gym.envs.flex.plastic_test_env import PlasticTestEnv
 from gym.envs.flex.plastic_spreading_rot_env import PlasticSpreadingRotEnv
 from gym.envs.flex.plastic_spreading_rot_height_env import PlasticSpreadingRotHeightEnv
+from gym.envs.flex.plastic_spreading_rot_height_particle_centeric_act_env import PlasticSpreadingRotHeightParticleCentricActEnv
+from gym.envs.flex.plastic_spring_multi_goal_particle_centered_env import PlasticSpringMultiGoalParticleCenteredEnv
