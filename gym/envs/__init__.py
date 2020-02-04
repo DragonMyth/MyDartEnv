@@ -597,37 +597,6 @@ register(
 
 #FLEX
 
-register(
-    id='FlexGranularSweep-v0',
-    entry_point='gym.envs.flex:GranularSweepRawImgEnv',
-    max_episode_steps=3000,
-)
-
-
-register(
-    id='FlexGranularSweep-v1',
-    entry_point='gym.envs.flex:GranularSweepDetailedImgGhostControlEnv',
-    max_episode_steps=1000,
-)
-
-register(
-    id='FlexGranularSweep-v2',
-    entry_point='gym.envs.flex:GranularSweepRawImgGhostControlEnv',
-    max_episode_steps=1000,
-)
-
-register(
-    id='FlexGranularSweep-v3',
-    entry_point='gym.envs.flex:GranularSweepRawImgRwdMeanStdEnv',
-    max_episode_steps=1000,
-)
-
-register(
-    id='FlexGranularSweep-v4',
-    entry_point='gym.envs.flex:GranularTwoGoalsEnv',
-    max_episode_steps=1000,
-)
-
 
 register(
     id='FlexPlasticReshaping-v0',
@@ -637,71 +606,16 @@ register(
 
 register(
     id='FlexPlasticReshaping-v1',
-    entry_point='gym.envs.flex:PlasticSpringReshapingEnv',
-    max_episode_steps=1000,
-)
-
-register(
-    id='FlexPlasticReshaping-v2',
-    entry_point='gym.envs.flex:PlasticSpringMultiGoalReshapingEnv',
-    max_episode_steps=100,
-)
-
-register(
-    id='FlexPlasticReshaping-v3',
-    entry_point='gym.envs.flex:PlasticSpringMultiGoalKnnReshapingEnv',
-    max_episode_steps=1000,
-)
-
-register(
-    id='FlexPlasticReshaping-v4',
-    entry_point='gym.envs.flex:PlasticSpringMultiGoalReshapingSolidEnv',
-    max_episode_steps=1000,
-)
-
-register(
-    id='FlexPlasticReshaping-v5',
-    entry_point='gym.envs.flex:PlasticSpringMultiGoalBarCenteredEnv',
-    max_episode_steps=500,
-)
-
-register(
-    id='FlexPlasticReshaping-v6',
     entry_point='gym.envs.flex:PlasticSpringMultiGoalBarCenteredRotEnv',
     max_episode_steps=500,
 )
 
 register(
-    id='FlexPlasticReshaping-v7',
-    entry_point='gym.envs.flex:PlasticSpreadingRotEnv',
-    max_episode_steps=500,
-)
-
-register(
-    id='FlexPlasticReshaping-v8',
+    id='FlexPlasticReshaping-v2',
     entry_point='gym.envs.flex:PlasticSpreadingRotHeightEnv',
     max_episode_steps=500,
 )
 
-register(
-    id='FlexPlasticReshaping-v9',
-    entry_point='gym.envs.flex:PlasticSpreadingRotHeightParticleCentricActEnv',
-    max_episode_steps=500,
-)
-
-register(
-    id='FlexPlasticReshaping-v10',
-    entry_point='gym.envs.flex:PlasticSpringMultiGoalParticleCenteredEnv',
-    max_episode_steps=500,
-)
-
-#
-#
-# register(
-#     id='FlexPlasticReshaping-v3',
-#     entry_point='gym.envs.flex:PlasticSpringMultiGoalKNNRWDEnv',
-#     max_episode_steps=1000,
-# )
 
 # Atari
 # ----------------------------------------

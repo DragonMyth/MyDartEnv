@@ -9,7 +9,6 @@ import itertools
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
-from sklearn.decomposition import PCA
 from scipy.spatial.distance import cdist
 try:
     import bindings as pyFlex
@@ -61,7 +60,6 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum =0
         self.rwdBuffer=[0 for _ in range(100)]
-        self.pca = PCA(1)
         self.curr_pc = np.array([[1.0,1.0],[-1.0,-1.0]])
         print("With Height Map Attraction")
     def generate_rand_rot_vec(self):
