@@ -40,11 +40,12 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
+
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
@@ -126,6 +127,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
        
         prev_obs = self._get_obs()
 
+        prev_height_sum = (np.mean(prev_part_heights,axis=1))
 
         #Simulation 
         done = self.do_simulation(flex_action, self.frame_skip)
@@ -165,7 +167,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
             (curr_part_state - prev_part_state), axis=2), axis=1) 
         part_movement_rwd = (1-np.exp(-40*part_movement_rwd))
         
-        curr_height_sum = (np.max(curr_part_heights,axis=1))
+        curr_height_sum = (np.mean(curr_part_heights,axis=1))
 
         # print(1-np.exp(-40*part_movement_rwd))
         target_dist_curr = np.zeros(self.numInstances)
@@ -182,8 +184,8 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
 
         
-        height_min_rwd = np.clip(np.exp(3*(-curr_height_sum)),0,1)
-        rewards =0.4*height_min_rwd+0.6*part_movement_rwd
+        height_min_rwd = (1-np.exp(-50*(prev_height_sum-curr_height_sum)))
+        rewards =1.0*height_min_rwd+0*part_movement_rwd
 
         # print(self.stage[0])
         self.rolloutRet+=rewards
@@ -191,7 +193,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
             'Total Reward': rewards[0],
 
         }
-        reward_decomp = [rewards[0],0.4*height_min_rwd[0],0.6*part_movement_rwd[0]]
+        reward_decomp = [rewards[0],1*height_min_rwd[0],0*part_movement_rwd[0]]
         if(len(self.rwdBuffer)>=100):
             self.rwdBuffer.pop(0)
         self.rwdBuffer.append(reward_decomp)

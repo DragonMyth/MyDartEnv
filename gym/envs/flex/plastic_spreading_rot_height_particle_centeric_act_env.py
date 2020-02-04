@@ -20,7 +20,7 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        self.direct_info_dim = 14
+        self.direct_info_dim = 13
         obs_size = self.resolution * self.resolution * 2 + self.direct_info_dim
 
         self.frame_skip = 10
@@ -31,14 +31,14 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([6,6,6])
+        self.clusterDim = np.array([4,6,4])
         action_bound = np.array([[-7, -20,-7, -np.pi / 2], [
             7,20, 7 ,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -60,6 +60,8 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
         self.currCurriculum =0
         self.rwdBuffer=[[0,0,0] for _ in range(100)]
         self.curr_pc = np.array([[1.0,1.0],[-1.0,-1.0]])
+        self.good_height = 0.2
+
         print("With Height Map Attraction Target Centric Action")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -93,6 +95,7 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
 
         heighest_idx = np.argmax(prev_part_heights,axis=1)
 
+        prev_obs = self._get_obs()
 
         for i in range(action.shape[0]):
             bar_rot_trans = prev_bar_state[i, 1,(0,2)]
@@ -106,18 +109,15 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
             targ_pos_trans = np.matmul(
                 bar_rot.transpose(),action[i, (0,2)])
 
-            action[i, (0,2)] = targ_pos_trans
+            # action[i, (0,2)] = targ_pos_trans
 
-            heighest_xz_pos = prev_part_state[i,heighest_idx[i]]
-            heighest_y_pos = prev_part_heights[i,heighest_idx[i]]
-
-            transformed_action[i, 0:3] = action[i, 0:3] + np.array([heighest_xz_pos[0],heighest_y_pos,heighest_xz_pos[1]])
+            transformed_action[i, 0:3] = action[i, 0:3] + prev_obs[i,10:13]
             transformed_action[i, 3:5] = np.matmul(prev_bar_state[i, 1,(0,2)], rot_mat[i].transpose())
 
         flex_action = np.zeros((self.numInstances,6))
         flex_action[:,0] = transformed_action[:,0]
 
-        flex_action[:,1] = transformed_action[:,1]
+        flex_action[:,1] = self.good_height
         
 
         flex_action[:,2] = transformed_action[:,2]
@@ -125,10 +125,9 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
         flex_action[:,4] = transformed_action[:,4]
         flex_action[:,5] = -1
        
-        prev_obs = self._get_obs()
         
 
-        prev_height_sum = (np.sum(prev_part_heights,axis=1))
+        prev_height_sum = (np.mean(prev_part_heights,axis=1))
 
         #Simulation 
         done = self.do_simulation(flex_action, self.frame_skip)
@@ -141,10 +140,12 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
         part_movement_rwd =  np.mean(np.linalg.norm(
             (curr_part_state - prev_part_state), axis=2), axis=1) 
         part_movement_rwd=(1-np.exp(-40*part_movement_rwd))
-        curr_height_sum = (np.max(curr_part_heights,axis=1))
+        
+        curr_height_sum = (np.mean(curr_part_heights,axis=1))
 
         target_dist_curr = np.zeros(self.numInstances)
         to_bar_dist_curr = np.zeros(self.numInstances)
+
         # for i in range(self.numInstances):
         #     dist= to_bar_dist_curr[i]
         #     if(dist<=2):
@@ -155,16 +156,11 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
         #         self.stage[i]  =  1
         #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
 
-        height_min_rwd = np.clip(np.exp(3*(-curr_height_sum)),0,1)
-        rewards =0.8*height_min_rwd+0.2*part_movement_rwd
+        height_min_rwd = (1-np.clip(np.exp(-50*(prev_height_sum-curr_height_sum)),0,1))
+        rewards =0.0*height_min_rwd+1*part_movement_rwd
 
-        # print(self.stage[0])
-        self.rolloutRet+=rewards
-        info = {
-            'Total Reward': rewards[0],
 
-        }
-        reward_decomp = [rewards[0],0.8*height_min_rwd[0],0.2*part_movement_rwd[0]]
+        reward_decomp = [rewards[0],0.0*height_min_rwd[0],1*part_movement_rwd[0]]
 
         # print(self.stage[0])
         self.rolloutRet+=rewards
@@ -211,7 +207,7 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
             height_map = self.get_mean_height_map(part_state_adjust,bar_state,bar_rot,part_height_adjust)
 
             obs = np.concatenate(
-                [bar_state[(0,2),:].flatten(),bar_state[1,(0,2)].flatten(),bar_state[3,(0,2)].flatten() ,[heighest_xz_pos[0],heighest_y_pos,heighest_xz_pos[1]],[stage], density.flatten(),height_map.flatten()
+                [bar_state[(0,2),:].flatten(),bar_state[1,(0,2)].flatten(),bar_state[3,(0,2)].flatten() ,[heighest_xz_pos[0],heighest_y_pos,heighest_xz_pos[1]], density.flatten(),height_map.flatten()
                  ])
             obs_list.append(obs)
 
@@ -358,9 +354,10 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
         self.setMapHalfExtent(self.mapHalfExtent)
         #
         pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 2))
-        pos_y = np.random.uniform(0,1,(self.numInstances,1))
-        rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 1))
+        # pos_y = np.random.uniform(0,3,(self.numInstances,1))
+        pos_y = np.ones((self.numInstances,1))*self.good_height
 
+        rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 1))
         # pos = np.zeros((self.numInstances, 2))
         # pos[:, 0] = -1.8
         # pos[:, 1] = -1.8
@@ -368,8 +365,9 @@ class PlasticSpreadingRotHeightParticleCentricActEnv(flex_env.FlexEnv):
         #rot[:,0] = np.pi/4
 
 
-        vel = np.random.uniform(-1, 1, (self.numInstances, 3))
-        angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 1))
+        vel = np.random.uniform(-3, 3, (self.numInstances, 3))
+        vel[:,1] = 0 
+        angVel = np.random.uniform(-1, 1, (self.numInstances, 1))
         barDim = np.tile(self.barDim, (self.numInstances, 1))
 
         controllers = np.concatenate([pos[:,0][:,np.newaxis],pos_y,pos[:,1][:,np.newaxis], rot, vel, angVel, barDim], axis=1)
