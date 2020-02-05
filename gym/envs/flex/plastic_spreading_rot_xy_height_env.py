@@ -17,11 +17,11 @@ except ImportError as e:
     raise error.DependencyNotInstalled(
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
-class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
+class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        self.direct_info_dim = 11
+        self.direct_info_dim = 14
         obs_size = self.resolution * self.resolution * 2 + self.direct_info_dim
 
         self.frame_skip = 10
@@ -32,26 +32,24 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([4, 4, 4])
-        action_bound = np.array([[-7, -20, -7, -np.pi / 2], [
-            7, 20, 7, np.pi / 2]])
+        self.clusterDim = np.array([6,6,6])
+        action_bound = np.array([[-7, -7, -7, -np.pi / 2,-np.pi / 2], [
+            7, 7, 7, np.pi / 2,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
-
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 0.5, 0.01])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
-        self.global_rot = self.generate_rand_rot_vec()
 
         self.initClusterparam = np.zeros(
             (self.numInstances, 6 * self.numInitClusters))
@@ -62,20 +60,8 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
-        self.good_height = 0.2
-        print("With Height Map Attraction")
-
-    def generate_rand_rot_vec(self):
-        # rand_rot_ang = np.ones(self.numInstances)
-        rand_rot_ang = 0
-
-        rand_rot_vec = np.ones((self.numInstances, 2, 2))
-
-        rand_rot_vec[:, 0, 0] = np.cos(rand_rot_ang)
-        rand_rot_vec[:, 0, 1] = -np.sin(rand_rot_ang)
-        rand_rot_vec[:, 1, 0] = np.sin(rand_rot_ang)
-        rand_rot_vec[:, 1, 1] = np.cos(rand_rot_ang)
-        return rand_rot_vec
+        self.minHeight = 0.2
+        print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
         rot_vec = np.ones((self.numInstances, 2, 2))
@@ -113,11 +99,11 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = self.good_height
+        flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
-        flex_action[:, 3] = 0
-        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 3]
+        flex_action[:, 3] = prev_bar_state[:, 1, 0] + action[:, 3]
+        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 4]
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
 
@@ -178,7 +164,9 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         #         self.stage[i]  =  1
         #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
 
-        height_min_rwd = (1 - np.exp(-50 * (prev_height_sum - curr_height_sum)))
+        height_min_rwd = (1 - np.clip(np.exp(-50 * (prev_height_sum - curr_height_sum)),0,2))
+        # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
+
         rewards = 1.0 * height_min_rwd + 0 * part_movement_rwd
 
         # print(self.stage[0])
@@ -229,13 +217,17 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
             #     plt.show()
 
             bar_pos = bar_state[0]  # 3
-            bar_ang = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])  # 2
-            bar_vel = bar_state[2]  # 3
-            bar_ang_vel = np.array([np.cos(bar_state[3, 1]), np.sin(bar_state[3, 1])])  # 2
+            bar_ang_x = np.array([np.cos(bar_state[1, 0]), np.sin(bar_state[1, 0])])  # 2
 
-            bar_info = np.concatenate([bar_pos, bar_ang, bar_vel, bar_ang_vel])
+            bar_ang_y = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])  # 2
+
+            bar_vel = bar_state[2]  # 3
+            bar_ang_vel_x = np.array([np.cos(bar_state[3, 0]), np.sin(bar_state[3, 0])])  # 2
+            bar_ang_vel_y = np.array([np.cos(bar_state[3, 1]), np.sin(bar_state[3, 1])])  # 2
+
+            bar_info = np.concatenate([bar_pos, bar_ang_x,bar_ang_y, bar_vel, bar_ang_vel_x,bar_ang_vel_y])
             obs = np.concatenate(
-                [bar_info, [stage], density.flatten(), height_map.flatten()
+                [bar_info, density.flatten(), height_map.flatten()
                  ])
 
             obs_list.append(obs)
@@ -320,16 +312,16 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
         flex_env.FlexEnv._reset(self)
 
         # Post-flex reset calculation
-        self.global_rot = self.generate_rand_rot_vec()
-
         self.setMapHalfExtent(self.mapHalfExtent)
 
         pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
-        pos[:, 1] = self.good_height  # Set the height at fixed good height
+        pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
+        
+        # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 3))
         rot[:, 2] = 0  # Do not control the z axis rotation
-        rot[:, 0] = 0  # Do not control the x axis rotation
+        # rot[:, 0] = 0  # Do not control the x axis rotation
 
         # pos = np.zeros((self.numInstances, 2))
         # pos[:, 0] = -1.8
@@ -342,7 +334,7 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
         angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 3))
         angVel[:, 2] = 0  # Set angular velocity around z to be 0
-        angVel[:, 0] = 0  # Set angular velocity around x to be 0
+        # angVel[:, 0] = 0  # Set angular velocity around x to be 0
 
         barDim = np.tile(self.barDim, (self.numInstances, 1))
 
@@ -533,18 +525,19 @@ class PlasticSpreadingRotHeightEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = PlasticSpreadingRotHeightEnv()
+    env = PlasticSpreadingRotXYHeightEnv()
 
     env.reset()
     for i in range(2000):
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 4))
+        act = np.zeros((49, 5))
         # act[:, 0]=-1
         # act[:, 1] = 1
         # act[:, 2] = 1
         act[:, 3] = 1
+        act[:, 4] = 1
 
         # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)

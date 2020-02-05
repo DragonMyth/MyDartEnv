@@ -212,7 +212,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
             bar_state = bar_states[i]
 
-            cos,sin = np.cos(bar_state[1,1]),np.cos(bar_state[3,1])
+            cos,sin = np.cos(bar_state[1,1]),np.sin(bar_state[1,1])
 
 
             bar_rot_vec = np.array([cos,sin])
@@ -224,10 +224,10 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
 
             density = self.get_particle_density(
-                part_state, bar_state[0,(0,2)], bar_rot, normalized=True)
+                part_state, bar_rot_vec, bar_rot, normalized=True)
 
             goal_gradient = self.get_goal_gradient(
-                self.center_list[self.circle_center[i]], bar_state[0,(0,2)], bar_rot)
+                self.center_list[self.circle_center[i]], bar_rot_vec, bar_rot)
 
 
             bar_pos = bar_state[0,(0,2)]  # 2
