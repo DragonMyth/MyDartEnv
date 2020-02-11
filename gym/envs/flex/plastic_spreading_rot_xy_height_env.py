@@ -39,7 +39,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -163,11 +163,11 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         #     else:
         #         self.stage[i]  =  1
         #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
-
-        height_min_rwd = (1 - np.clip(np.exp(-50 * (prev_height_sum - curr_height_sum)),0,2))
+        # print(1 - curr_height_sum)
+        height_min_rwd = (1 - np.clip(np.exp(- (0.8 - curr_height_sum)),0,2))
         # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
-        rewards = 1.0 * height_min_rwd + 0 * part_movement_rwd
+        rewards = 1 * height_min_rwd + 0 * part_movement_rwd
 
         # print(self.stage[0])
         self.rolloutRet += rewards

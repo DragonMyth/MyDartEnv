@@ -39,12 +39,11 @@ class PlasticTestEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
-
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
@@ -61,6 +60,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
+        self.minHeight = 0.2
         print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
@@ -99,7 +99,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = np.clip(transformed_action[:, 1],0.2,10)
+        flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = prev_bar_state[:, 1, 0] + action[:, 3]
@@ -164,8 +164,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
         #         self.stage[i]  =  1
         #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
 
-        # height_min_rwd = (1 - np.clip(np.exp(-50 * (prev_height_sum - curr_height_sum)),0,2))
-        height_min_rwd = 50*(prev_height_sum - curr_height_sum)
+        height_min_rwd = (1 - np.clip(np.exp(-50 * (prev_height_sum - curr_height_sum)),0,2))
+        # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         rewards = 1.0 * height_min_rwd + 0 * part_movement_rwd
 
@@ -315,6 +315,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.setMapHalfExtent(self.mapHalfExtent)
 
         pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
+        pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
+        
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 3))
