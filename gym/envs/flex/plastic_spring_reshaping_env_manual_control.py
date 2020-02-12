@@ -69,7 +69,7 @@ def generate_manual_action(w, a, s, d, cw, ccw, ghost, skip, obs):
 def generate_manual_action_abs_rot(w, a, s, d, cw, ccw, ghost, skip, obs):
     bar_state = obs[0, 0:4]
 
-    act = np.zeros((1, 5))
+    act = np.zeros((1, 3))
 
     linear_scale = 2
     ang_scale = 0.3 * np.pi
@@ -105,8 +105,8 @@ def generate_manual_action_abs_rot(w, a, s, d, cw, ccw, ghost, skip, obs):
         rot_vec = np.matmul(bar_state[2:4].transpose(), rot_vec.transpose()).transpose()
         # print(rot_vec)
         act[0, 0:2] =  linear_relative_target
-        act[0, 2:4] = rot_vec
-        act[0, 4] = ghost_cont
+        act[0, 2] = target_angle
+        # act[0, 4] = ghost_cont
 
     else:
         # act[0, 0:4] = bar_state
@@ -259,7 +259,7 @@ if __name__ == '__main__':
             env.render()
             state = flex_env.FlexEnv.get_state(env.unwrapped)
 
-            act = generate_manual_action_rel_rot_vert(W, A, S, D, CW, CCW, Up,Down, skip, obs)
+            act = generate_manual_action_abs_rot(W, A, S, D, CW, CCW, 0, skip, obs)
             # print(act)
             act = act[:]/env.unwrapped.action_scale
             obs, rwd, done, info = env.step(act)

@@ -17,7 +17,7 @@ except ImportError as e:
     raise error.DependencyNotInstalled(
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
-class PlasticTestEnv(flex_env.FlexEnv):
+class PlasticFlippingEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -32,14 +32,14 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5,5,5])
+        self.clusterDim = np.array([5,2,5])
         action_bound = np.array([[-7, -7, -7, -np.pi / 2,-np.pi / 2], [
             7, 7, 7, np.pi / 2,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -47,7 +47,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 0.5, 0.01])
+        self.barDim = np.array([0.7, 0.7, 0.01])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
 
@@ -99,7 +99,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
+        flex_action[:, 1] = transformed_action[:, 1]
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = prev_bar_state[:, 1, 0] + action[:, 3]
@@ -314,15 +314,13 @@ class PlasticTestEnv(flex_env.FlexEnv):
         # Post-flex reset calculation
         self.setMapHalfExtent(self.mapHalfExtent)
 
-        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
-        # pos[:,(0,2)]=4
-        pos[:,1] =1
-
+        pos = np.zeros((self.numInstances, 3))
+        pos[:,2] = -0.4
         # pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
-        
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
-        rot = np.random.uniform(-np.pi/2, np.pi/2, (self.numInstances, 3))
+        rot = np.zeros((self.numInstances, 3))
+        rot[:,0] = np.pi/2
 
         rot[:, 2] = 0  # Do not control the z axis rotation
 
@@ -332,13 +330,10 @@ class PlasticTestEnv(flex_env.FlexEnv):
         # rot = np.zeros((self.numInstances,1))
         # rot[:,0] = np.pi/4
 
-        vel = np.random.uniform(-1, 1, (self.numInstances, 3))
+        vel = np.zeros((self.numInstances, 3))
         # vel[:, 1] = 0  # Set vertical velocity to zero
 
-        vel[:] = 0  # Set vertical velocity to zero
-
-        angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 3))
-        angVel[:] = 0  # Set angular velocity around z to be 0
+        angVel = np.zeros((self.numInstances, 3))
 
         # angVel[:, 2] = 0  # Set angular velocity around z to be 0
         # angVel[:, 0] = 0  # Set angular velocity around x to be 0
@@ -532,19 +527,19 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = PlasticTestEnv()
+    env = PlasticFlippingEnv()
 
     env.reset()
     for i in range(2000):
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((1, 5))
+        act = np.zeros((49, 5))
         # act[:, 0]=0
-        # act[:, 1] = -1
+        act[:, 1] = 1
         # act[:, 2] = 0
-        # act[:, 3] = 0
-        act[:, 4] = 1
+        # act[:, 3] = -1
+        # act[:, 4] = 1
 
         # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)
