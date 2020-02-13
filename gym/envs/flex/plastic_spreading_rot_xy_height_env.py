@@ -179,7 +179,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         if (len(self.rwdBuffer) >= 100):
             self.rwdBuffer.pop(0)
-        
+
         self.rwdBuffer.append(reward_decomp)
 
         return obs, rewards, done, info
@@ -290,10 +290,10 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         self.rolloutRet = np.zeros(self.numInstances)
         if self.randomCluster:
-            self.idxPool = np.array([[0, 0]])
+            # self.idxPool = np.array([[0, 0]])
 
-            # self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
-            #     self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
+            self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
+                 self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
 
             # Pre-flex reset calculation
             self.initClusterparam = np.zeros(
@@ -317,14 +317,14 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.setMapHalfExtent(self.mapHalfExtent)
 
         pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
-        pos[:,(0,2)]=4
-        pos[:,1] =0
+        # pos[:,(0,2)]=4
+        # pos[:,1] =0
 
-        # pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
-        
+        pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
+
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
-        rot = np.random.uniform(-np.pi/2, np.pi/2, (self.numInstances, 3))*0+np.pi/4
+        rot = np.random.uniform(-np.pi/3, np.pi/3, (self.numInstances, 3))
 
         rot[:, 2] = 0  # Do not control the z axis rotation
 
@@ -334,15 +334,12 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # rot = np.zeros((self.numInstances,1))
         # rot[:,0] = np.pi/4
 
-        vel = np.random.uniform(-1, 1, (self.numInstances, 3))
-        # vel[:, 1] = 0  # Set vertical velocity to zero
-
-        vel[:] = 0  # Set vertical velocity to zero
+        vel = np.random.uniform(-0.1,0.1, (self.numInstances, 3))
+        vel[:, 1] = 0  # Set vertical velocity to zero
 
         angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 3))
-        angVel[:] = 0  # Set angular velocity around z to be 0
 
-        # angVel[:, 2] = 0  # Set angular velocity around z to be 0
+        angVel[:, 2] = 0  # Set angular velocity around z to be 0
         # angVel[:, 0] = 0  # Set angular velocity around x to be 0
 
         barDim = np.tile(self.barDim, (self.numInstances, 1))
