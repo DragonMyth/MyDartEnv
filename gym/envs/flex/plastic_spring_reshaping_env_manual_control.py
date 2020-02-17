@@ -119,6 +119,65 @@ def generate_manual_action_abs_rot(w, a, s, d, cw, ccw, ghost, skip, obs):
     # print(act)
     return act
 
+
+
+def generate_manual_action_rot_tilt(w, a, s, d, up,down,cw, ccw, cw_t, ccw_t,skip, obs):
+    bar_state = obs[0, 0:4]
+
+    act = np.zeros((1, 5))
+
+    linear_scale = 2
+    ang_scale = 0.3 * np.pi
+    linear_relative_target = np.zeros(3)
+
+    target_angle =0# np.arctan2(bar_state[1,1],bar_state[1,0])
+    target_angle_tilt = 0
+    ghost_cont = 0
+    if w:
+        linear_relative_target += (np.array([0, 0,-1]) * linear_scale)
+
+    if s:
+        linear_relative_target += (np.array([0, 0,1]) * linear_scale)
+
+    if a:
+        linear_relative_target += (np.array([-1,0, 0]) * linear_scale)
+    if d:
+        linear_relative_target += (np.array([1,0, 0]) * linear_scale)
+    if up:
+        linear_relative_target += (np.array([0,1, 0]) * linear_scale)
+    if down:
+        linear_relative_target += (np.array([0,-1, 0]) * linear_scale)
+
+    if ccw:
+        target_angle += 1 * ang_scale
+    if cw:
+        target_angle += -1 * ang_scale
+
+
+    if ccw_t:
+        target_angle_tilt += 1 * ang_scale
+    if cw_t:
+        target_angle_tilt += -1 * ang_scale
+
+
+    if not skip:
+        # print(rot_vec)
+        act[0, 0:3] =  linear_relative_target#+np.array([0,bar_state[1],0])
+        act[0,3] = target_angle_tilt
+
+        act[0, 4] = target_angle
+
+    else:
+        # act[0, 0:4] = bar_state
+        # act[0, 4] = 0
+        pass
+
+    # act = np.array([[0.52088761, -2.95443344, 1, 0, 0]])
+    # act = np.array([[1,0 ,1, 0, 0]])
+
+    # print(act)
+    return act
+
 def generate_manual_action_rel_rot_vert(w, a, s, d, cw, ccw, up,down, skip, obs):
     bar_state = obs[0, 0:4]
 
@@ -222,6 +281,8 @@ if __name__ == '__main__':
         D = False
         CW = False
         CCW = False
+        CW_T = False
+        CCW_T = False
         Up = False
         Down = False
         Ghost = False
@@ -246,21 +307,33 @@ if __name__ == '__main__':
 
         if keys[pg.K_k]:
             CW = True
+        
+        if keys[pg.K_l]:
+            CW_T = True
+        
+        if keys[pg.K_SEMICOLON]:
+            CCW_T = True
 
         if keys[pg.K_SPACE]:
             skip = True
 
         if keys[pg.K_LSHIFT]:
             Up = True
+
         if keys[pg.K_LCTRL]:
             Down = True
-        key_pressed = W or A or S or D or CW or CCW or Up or Down or skip
+
+        key_pressed = W or A or S or D or CW or CCW or CW_T or CCW_T or Up or Down or skip
+
         if (key_pressed or not paused):
             env.render()
             state = flex_env.FlexEnv.get_state(env.unwrapped)
 
-            act = generate_manual_action_abs_rot(W, A, S, D, CW, CCW, 0, skip, obs)
+            # act = generate_manual_action_abs_rot(W, A, S, D, CW, CCW, 0, skip, obs)
             # print(act)
+
+            act = generate_manual_action_rot_tilt(W, A, S, D,Up,Down, CW, CCW, CW_T,CCW_T, skip, obs)
+
             act = act[:]/env.unwrapped.action_scale
             obs, rwd, done, info = env.step(act)
 

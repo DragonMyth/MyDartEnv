@@ -110,6 +110,21 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         prev_height_sum = (np.mean(prev_part_heights, axis=1))
 
+        prev_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
+      
+        for i in range(self.numInstances):
+            part_state = prev_part_state[i]
+
+            filtered_parts = part_state[
+                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+
+            height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
+                                              prev_part_heights[i])
+
+            prev_untransformed_height[i] = height.flatten()
+
+        prev_height_cnt = np.sum((prev_untransformed_height>0).astype(int),axis=1)
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
 
@@ -117,8 +132,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         obs = self._get_obs()
 
-        untransformed_density = np.zeros((self.numInstances, self.resolution * self.resolution))
-        untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
+        curr_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
 
         for i in range(self.numInstances):
             part_state = curr_part_state[i]
@@ -127,24 +141,21 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
 
-            density = self.get_particle_density(
-                filtered_parts, np.array([[0, 0, 0]]), np.identity(2), normalized=True)
-
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
                                               curr_part_heights[i])
-            untransformed_density[i] = density.flatten()
-            untransformed_height[i] = height.flatten()
+            curr_untransformed_height[i] = height.flatten()
+        
+        curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
+        # maxFlatIdx = np.argmax(curr_untransformed_height, axis=1)
+        # maxI = (maxFlatIdx / self.resolution).astype(int)
+        # maxJ = maxFlatIdx - self.resolution * maxI
 
-        maxFlatIdx = np.argmax(untransformed_height, axis=1)
-        maxI = (maxFlatIdx / self.resolution).astype(int)
-        maxJ = maxFlatIdx - self.resolution * maxI
+        # posX = np.expand_dims((maxJ + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
+        # posY = np.expand_dims((maxI + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
 
-        posX = np.expand_dims((maxJ + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
-        posY = np.expand_dims((maxI + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
-
-        densePos = np.concatenate([posX, posY], axis=1)
-        # transformed_densePos = np.matmul()
-        to_bar_dist_curr = (np.linalg.norm(densePos - curr_bar_state[:, 0, (0, 2)], axis=1)) ** 2
+        # densePos = np.concatenate([posX, posY], axis=1)
+        # # transformed_densePos = np.matmul()
+        # to_bar_dist_curr = (np.linalg.norm(densePos - curr_bar_state[:, 0, (0, 2)], axis=1)) ** 2
 
         part_movement_rwd = np.mean(np.linalg.norm(
             (curr_part_state - prev_part_state), axis=2), axis=1)
@@ -153,7 +164,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         curr_height_sum = (np.mean(curr_part_heights, axis=1))
 
         # print(1-np.exp(-40*part_movement_rwd))
-        target_dist_curr = np.zeros(self.numInstances)
+        # target_dist_curr = np.zeros(self.numInstances)
+
         # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
         # for i in range(self.numInstances):
         #     dist= to_bar_dist_curr[i]
@@ -164,7 +176,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         #         self.stage[i]  =  1
         #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
         # print(1 - curr_height_sum)
-        height_min_rwd = prev_height_sum - curr_height_sum
+        height_min_rwd = (curr_height_cnt-prev_height_cnt)
+        
         # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         rewards = 1 * height_min_rwd + 0 * part_movement_rwd
@@ -228,6 +241,9 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             bar_ang_vel_y = np.array([np.cos(bar_state[3, 1]),np.sin(bar_state[3,1])])  # 2
 
             bar_info = np.concatenate([bar_pos, bar_ang_x,bar_ang_y, bar_vel, bar_ang_vel_x,bar_ang_vel_y])
+
+            height_map[height_map>0] = bar_pos[1]-height_map[height_map>0]
+
             obs = np.concatenate(
                 [bar_info, density.flatten(), height_map.flatten()
                  ])
@@ -290,10 +306,10 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         self.rolloutRet = np.zeros(self.numInstances)
         if self.randomCluster:
-            # self.idxPool = np.array([[0, 0]])
+            self.idxPool = np.array([[0, 0]])
 
-            self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
-                 self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
+            # self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
+            #      self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
 
             # Pre-flex reset calculation
             self.initClusterparam = np.zeros(
@@ -532,7 +548,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
 if __name__ == '__main__':
     env = PlasticSpreadingRotXYHeightEnv()
-
+    env.seed(0)
     env.reset()
     for i in range(2000):
         # env.render()
@@ -540,8 +556,8 @@ if __name__ == '__main__':
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((49, 5))
         # act[:, 0]=0
-        # act[:, 1] = -1
-        act[:, 2] = -1
+        act[:, 1] = 1
+        # act[:, 2] = -1
         # act[:, 3] = 0
         # act[:, 4] = 1
 
