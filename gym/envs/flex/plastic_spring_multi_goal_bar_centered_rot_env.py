@@ -37,15 +37,15 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.clusterDim = np.array([5, 2, 5])
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
-            7, 7, np.pi / 2,1]])
+        action_bound = np.array([[-7, -7, -np.pi / 2], [
+            7, 7, np.pi / 2]])
         # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
         #     7, 7, np.pi / 2,-1]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -76,7 +76,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =1
+        self.currCurriculum =0
         print("Plastic Goal Sweeping")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)

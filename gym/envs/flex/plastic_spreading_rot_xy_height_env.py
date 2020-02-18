@@ -40,7 +40,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -61,7 +61,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
-        self.minHeight = 0.2
+        self.minHeight =0.23
         print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
@@ -114,13 +114,16 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
       
         for i in range(self.numInstances):
             part_state = prev_part_state[i]
+            part_height = prev_part_heights[i]
 
             filtered_parts = part_state[
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
+            filtered_heights = part_height[(part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
 
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
-                                              prev_part_heights[i])
+                                              filtered_heights)
 
             prev_untransformed_height[i] = height.flatten()
 
@@ -136,13 +139,17 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         for i in range(self.numInstances):
             part_state = curr_part_state[i]
+            part_height = curr_part_heights[i]
 
             filtered_parts = part_state[
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
+            filtered_heights = part_height[(part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
 
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
-                                              curr_part_heights[i])
+                                              filtered_heights)
+                                              
             curr_untransformed_height[i] = height.flatten()
         
         curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
@@ -176,8 +183,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         #         self.stage[i]  =  1
         #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
         # print(1 - curr_height_sum)
-        height_min_rwd = (curr_height_cnt-prev_height_cnt)
-        
+        height_min_rwd = curr_height_cnt-prev_height_cnt
         # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         rewards = 1 * height_min_rwd + 0 * part_movement_rwd
@@ -205,11 +211,15 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         for i in range(self.numInstances):
             stage = self.stage[i]
             part_state = part_states[i]
+            part_height = part_heights[i]
+            
+            part_height = part_height[
+                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
             part_state = part_state[
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
-            part_height = part_heights[i]
-
+            
             bar_state = bar_states[i]
 
             bar_y_rot_vec = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])
@@ -220,11 +230,10 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             bar_rot[1, 0] = bar_y_rot_vec[1]
             bar_rot[1, 1] = bar_y_rot_vec[0]
 
+            height_map = self.get_mean_height_map(part_state.copy(), bar_state, bar_rot, part_height.copy())
+
             density = self.get_particle_density(
-                part_state, bar_state, bar_rot, normalized=True)
-
-            height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height)
-
+                part_state.copy(), bar_state, bar_rot, normalized=True)
             # if(i==0):
             #     import matplotlib.pyplot as plt
             #     plt.figure()
@@ -242,7 +251,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
             bar_info = np.concatenate([bar_pos, bar_ang_x,bar_ang_y, bar_vel, bar_ang_vel_x,bar_ang_vel_y])
 
-            height_map[height_map>0] = bar_pos[1]-height_map[height_map>0]
+            # height_map[height_map>0] = bar_pos[1]-height_map[height_map>0]
 
             obs = np.concatenate(
                 [bar_info, density.flatten(), height_map.flatten()
@@ -255,12 +264,15 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
     def get_particle_density(self, particles, bar_state, rot, normalized=True, width=2.5):
         if (particles.shape[0] == 0):
             return np.zeros((self.resolution, self.resolution))
+        
+        
         particles -= bar_state[0, (0, 2)]
 
         particles = np.matmul(particles, rot.transpose())
 
         particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
 
+        
         H = self.get_density(particles, self.resolution,
                              width, self.mapHalfExtent)
 
@@ -279,9 +291,12 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         particles = np.matmul(particles, rot.transpose())
 
         particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
+
         # H = self.get_density(particles, self.resolution,
         #                      2.5, self.mapHalfExtent)
+
         H = self.get_height_map(particles, heights, self.resolution, width, self.mapHalfExtent)
+
         # print(np.max(H))
         # if normalized:
         # H = H ** (1.0 / 2)
@@ -334,16 +349,14 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
         # pos[:,(0,2)]=4
-        # pos[:,1] =0
+        pos[:,1] =np.random.uniform(self.minHeight, 1, (self.numInstances))
 
-        pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
-
+        # pos[:,2] = -0.7
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
         rot = np.random.uniform(-np.pi/3, np.pi/3, (self.numInstances, 3))
 
         rot[:, 2] = 0  # Do not control the z axis rotation
-
         # pos = np.zeros((self.numInstances, 2))
         # pos[:, 0] = -1.8
         # pos[:, 1] = -1.8
@@ -556,10 +569,10 @@ if __name__ == '__main__':
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((49, 5))
         # act[:, 0]=0
-        act[:, 1] = 1
+        # act[:, 1] = 1
         # act[:, 2] = -1
         # act[:, 3] = 0
-        # act[:, 4] = 1
+        act[:, 4] = 1
 
         # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)
