@@ -40,7 +40,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -48,7 +48,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 0.8, 0.01])
+        self.barDim = np.array([0.7, 1, 0.001])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
 
@@ -61,7 +61,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
-        self.minHeight =0.23
+        self.minHeight =0.15
         print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
@@ -100,7 +100,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = transformed_action[:, 1]
+        flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = prev_bar_state[:, 1, 0] + action[:, 3]
@@ -123,7 +123,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
 
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
-                                              filtered_heights)
+                                              filtered_heights,width=1.5)
 
             prev_untransformed_height[i] = height.flatten()
 
@@ -137,9 +137,14 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         curr_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
 
+        part_movement_rwd = np.zeros((self.numInstances))
+
+        curr_outlier_cnt = np.zeros((self.numInstances))
         for i in range(self.numInstances):
             part_state = curr_part_state[i]
             part_height = curr_part_heights[i]
+            part_state_p = prev_part_state[i]
+            part_height_p = prev_part_heights[i]
 
             filtered_parts = part_state[
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
@@ -148,12 +153,29 @@ class PlasticTestEnv(flex_env.FlexEnv):
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
 
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
-                                              filtered_heights)
-                                              
+                                              filtered_heights,width=1.5)
+
+            outliers = part_state[
+                (part_state[:, 0] < -self.mapHalfExtent) | (part_state[:, 0] > self.mapHalfExtent) | (
+                        part_state[:, 1] < -self.mapHalfExtent) | (part_state[:, 1] > self.mapHalfExtent)]
             curr_untransformed_height[i] = height.flatten()
-        
+
+            part_movement = np.linalg.norm(part_state_p-part_state,axis=1)
+            part_movement[part_height_p<0.2] *=-20
+            part_movement_rwd[i] = np.mean(part_movement,axis=0)
+            curr_outlier_cnt[i] = outliers.shape[0]
+        # curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
+
         curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
-        # maxFlatIdx = np.argmax(curr_untransformed_height, axis=1)
+
+
+        heighest_part_idx = np.argmax(curr_part_heights, axis=1)
+        heighest_part_pos = np.take_along_axis(curr_part_state,heighest_part_idx[:,np.newaxis,np.newaxis],axis=1)
+        heighest_part_pos = np.squeeze(heighest_part_pos,axis=1)
+
+        heighest_height = np.take_along_axis(curr_part_heights,heighest_part_idx[:,np.newaxis],axis=1)
+        heighest_height = np.squeeze(heighest_height,axis=1)
+        # heighest_part_pos = np.concatenate(heighest_part_pos[:,0],heighest_height[:,0],heighest_part_pos[:,1])
         # maxI = (maxFlatIdx / self.resolution).astype(int)
         # maxJ = maxFlatIdx - self.resolution * maxI
 
@@ -162,40 +184,42 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         # densePos = np.concatenate([posX, posY], axis=1)
         # # transformed_densePos = np.matmul()
-        # to_bar_dist_curr = (np.linalg.norm(densePos - curr_bar_state[:, 0, (0, 2)], axis=1)) ** 2
+        to_bar_dist_curr = (np.linalg.norm(heighest_part_pos - curr_bar_state[:, 0, (0, 2)], axis=1)) ** 2
+        to_bar_height_dist_curr = curr_bar_state[:, 0, 1]-heighest_height
 
-        part_movement_rwd = np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1)
-        part_movement_rwd = (1 - np.exp(-40 * part_movement_rwd))
+        # part_movement_rwd = np.mean(np.linalg.norm(
+        #     (curr_part_state - prev_part_state), axis=2), axis=1)
 
+            
         curr_height_sum = (np.mean(curr_part_heights, axis=1))
 
         # print(1-np.exp(-40*part_movement_rwd))
-        # target_dist_curr = np.zeros(self.numInstances)
+        target_dist_curr = np.zeros(self.numInstances)
 
         # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
         # for i in range(self.numInstances):
         #     dist= to_bar_dist_curr[i]
-        #     if(dist<=2):
+        #     height_dist = to_bar_height_dist_curr[i]
+
+        #     if(dist<=1 and -0.5<height_dist):
         #         self.stage[i]  =  0
-        #         target_dist_curr[i] = 0.4*np.clip(np.exp(3*(-curr_height_sum[i])),0,1)+0.6*(1-np.exp(-40*part_movement_rwd[i]))
+        #         target_dist_curr[i] = 0.1*(curr_height_cnt[i]-prev_height_cnt[i])+10*(prev_height_sum[i]-curr_height_sum[i])
         #     else:
         #         self.stage[i]  =  1
-        #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
+        #         target_dist_curr[i] = -0.1*dist+0.03*height_dist
         # print(1 - curr_height_sum)
-        height_min_rwd = curr_height_cnt
-        print(height_min_rwd)
+        # height_min_rwd = 0.1*(curr_height_cnt-prev_height_cnt)+10*(prev_height_sum-curr_height_sum)
         # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
-        rewards = 1 * height_min_rwd + 0 * part_movement_rwd
-
+        # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
+        rewards = 5*part_movement_rwd+0.5*(curr_height_cnt-prev_height_cnt) - curr_outlier_cnt
         # print(self.stage[0])
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
         }
 
-        reward_decomp = [rewards[0], 1 * height_min_rwd[0], 0 * part_movement_rwd[0]]
+        reward_decomp = [rewards[0], 0,0]
 
         if (len(self.rwdBuffer) >= 100):
             self.rwdBuffer.pop(0)
@@ -348,28 +372,26 @@ class PlasticTestEnv(flex_env.FlexEnv):
         # Post-flex reset calculation
         self.setMapHalfExtent(self.mapHalfExtent)
 
-        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))*0
+        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
         # pos[:,(0,2)]=4
-        # pos[:,1] =0
+        pos[:,1] =np.random.uniform(self.minHeight, 1, (self.numInstances))
 
-        pos[:,1] = 0
         # pos[:,2] = -0.7
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
-        rot = np.random.uniform(-np.pi/3, np.pi/3, (self.numInstances, 3))*0
+        rot = np.random.uniform(-np.pi/3, np.pi/3, (self.numInstances, 3))
 
         rot[:, 2] = 0  # Do not control the z axis rotation
-        rot[:,0] = np.pi/2
         # pos = np.zeros((self.numInstances, 2))
         # pos[:, 0] = -1.8
         # pos[:, 1] = -1.8
         # rot = np.zeros((self.numInstances,1))
         # rot[:,0] = np.pi/4
 
-        vel = np.random.uniform(-0.1,0.1, (self.numInstances, 3))*0
+        vel = np.random.uniform(-0.1,0.1, (self.numInstances, 3))
         vel[:, 1] = 0  # Set vertical velocity to zero
 
-        angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 3))*0
+        angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 3))
 
         angVel[:, 2] = 0  # Set angular velocity around z to be 0
         # angVel[:, 0] = 0  # Set angular velocity around x to be 0

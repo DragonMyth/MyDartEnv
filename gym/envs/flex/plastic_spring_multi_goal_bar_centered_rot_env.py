@@ -35,33 +35,35 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.numInitClusters = 1
         self.randomCluster = True
         self.clusterDim = np.array([5, 2, 5])
+        # self.clusterDim = np.array([15, 2, 15])
+
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-7, -7, -np.pi / 2], [
-            7, 7, np.pi / 2]])
+        action_bound = np.array([[-10, -10, -np.pi / 2], [
+            10, 10, np.pi / 2]])
         # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
         #     7, 7, np.pi / 2,-1]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 0.5, 0.01])
+        self.barDim = np.array([0.7, 0.5, 0.001])
 
         # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
-        self.center_list = np.random.uniform(-3, 3, (100, 2))
+        # self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -160,7 +162,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
 
         part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1) * 10
+            (curr_part_state - prev_part_state), axis=2), axis=1) * 1
 
 
         target_dist_curr = np.zeros(self.numInstances)
@@ -539,7 +541,7 @@ if __name__ == '__main__':
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 4))
+        act = np.zeros((49, 3))
         # act[:, 0] = 0
         act[:, 1] = -1
 
