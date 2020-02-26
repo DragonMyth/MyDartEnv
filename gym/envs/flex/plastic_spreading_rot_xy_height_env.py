@@ -34,8 +34,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.numInitClusters = 1
         self.randomCluster = True
         self.clusterDim = np.array([5,5,5])
-        action_bound = np.array([[-10, -10, -10, -np.pi / 2,-np.pi / 2], [
-            10, 10, 10, np.pi / 2,np.pi / 2]])
+        action_bound = np.array([[-4, -10, -4, -np.pi / 2,-np.pi / 2], [
+            4, 10, 4, np.pi / 2,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high

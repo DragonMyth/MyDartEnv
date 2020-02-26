@@ -39,10 +39,10 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-10, -10, -np.pi / 2], [
-            10, 10, np.pi / 2]])
-        # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
-        #     7, 7, np.pi / 2,-1]])
+        action_bound = np.array([[-2, -2, -np.pi / 2], [
+            2, 2, np.pi / 2]])
+        # action_bound = np.array([[-2, -2, -np.pi / 2,-1], [
+        #     2, 2, np.pi / 2,-1]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
@@ -54,7 +54,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 0.5, 0.001])
+        self.barDim = np.array([0.7, 0.5, 0.03])
 
         # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
@@ -162,7 +162,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
 
         part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1) * 1
+            (curr_part_state - prev_part_state), axis=2), axis=1) * 10
 
 
         target_dist_curr = np.zeros(self.numInstances)
