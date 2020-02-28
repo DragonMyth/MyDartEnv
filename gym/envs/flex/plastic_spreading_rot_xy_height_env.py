@@ -34,14 +34,13 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.numInitClusters = 1
         self.randomCluster = True
         self.clusterDim = np.array([5,5,5])
-        action_bound = np.array([[-4, -10, -4, -np.pi / 2,-np.pi / 2], [
-            4, 10, 4, np.pi / 2,np.pi / 2]])
+        action_bound = np.array([[-7, -7, -7, -np.pi / 2,-np.pi / 2], [
+            7, 7, 7, np.pi / 2,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
         flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
-
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
@@ -61,7 +60,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
-        self.minHeight =0.15
+        self.minHeight =0.18
         print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
@@ -103,7 +102,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
-        flex_action[:, 3] = prev_bar_state[:, 1, 0] + action[:, 3]
+        flex_action[:, 3] = np.clip(prev_bar_state[:, 1, 0] + action[:, 3],-np.pi/3,np.pi/3)
         flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 4]
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
@@ -212,7 +211,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
-        rewards = 5*part_movement_rwd+0.5*(curr_height_cnt-prev_height_cnt) - curr_outlier_cnt
+        rewards = 1*part_movement_rwd+2*(curr_height_cnt-prev_height_cnt) - 0.1*curr_outlier_cnt
         # print(self.stage[0])
         self.rolloutRet += rewards
         info = {
@@ -238,12 +237,12 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             part_state = part_states[i]
             part_height = part_heights[i]
             
-            # part_height = part_height[
-            #     (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-            #             part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
-            # part_state = part_state[
-            #     (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-            #             part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+            part_height = part_height[
+                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+            part_state = part_state[
+                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
             
             bar_state = bar_states[i]
 
