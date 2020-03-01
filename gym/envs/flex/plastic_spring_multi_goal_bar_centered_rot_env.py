@@ -39,8 +39,8 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-7, -7, -np.pi / 2], [
-           7, 7, np.pi / 2]])
+        action_bound = np.array([[-4, -4, -np.pi / 2], [
+           4, 4, np.pi / 2]])
         # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
         #     7, 7, np.pi / 2,-1]])
 
@@ -56,9 +56,9 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
         self.barDim = np.array([0.7, 0.5, 0.001])
 
-        self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
+        # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
@@ -78,7 +78,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =3
+        self.currCurriculum =0
         print("Plastic Goal Sweeping")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -162,7 +162,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
 
         part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1) * 10
+            (curr_part_state - prev_part_state), axis=2), axis=1) * 5
 
 
         target_dist_curr = np.zeros(self.numInstances)
