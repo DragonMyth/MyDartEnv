@@ -61,7 +61,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
-        self.minHeight =0.15
+        self.minHeight =0.18
         print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
@@ -76,7 +76,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
     def _step(self, action):
         action = action * self.action_scale
         prev_bar_state, prev_part_state, prev_part_heights = self.get_state()
-
+        print(prev_bar_state[:,2])
         rot_mat = self.angle_to_rot_matrix(action[:, 3])
 
         transformed_action = np.zeros((self.numInstances, 6))

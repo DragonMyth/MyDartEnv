@@ -126,7 +126,7 @@ def generate_manual_action_rot_tilt(w, a, s, d, up,down,cw, ccw, cw_t, ccw_t,ski
 
     act = np.zeros((1, 5))
 
-    linear_scale = 2
+    linear_scale = 0.5
     ang_scale = 0.3 * np.pi
     linear_relative_target = np.zeros(3)
 
@@ -333,8 +333,9 @@ if __name__ == '__main__':
             # print(act)
 
             act = generate_manual_action_rot_tilt(W, A, S, D,Up,Down, CW, CCW, CW_T,CCW_T, skip, obs)
+            print("Action", act)
             # act = generate_manual_action_abs_rot(W,A,S,D,CW,CCW,Ghost,skip,obs)
-            act = act[:]/env.unwrapped.action_scale
+            act = act[:]#/env.unwrapped.action_scale
             obs, rwd, done, info = env.step(act)
 
             ret+=rwd[0]

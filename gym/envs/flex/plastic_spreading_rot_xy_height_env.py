@@ -34,8 +34,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.numInitClusters = 1
         self.randomCluster = True
         self.clusterDim = np.array([5,5,5])
-        action_bound = np.array([[-7, -7, -7, -np.pi / 2,-np.pi / 2], [
-            7, 7, 7, np.pi / 2,np.pi / 2]])
+        action_bound = np.array([[-4, -4, -4, -np.pi / 2,-np.pi / 2], [
+            4, 4, 4, np.pi / 2,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
@@ -117,10 +117,10 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             part_height = prev_part_heights[i]
 
             filtered_parts = part_state[
-                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
-            filtered_heights = part_height[(part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
+                (part_state[:, 0] > -0.8*self.mapHalfExtent) & (part_state[:, 0] < 0.8*self.mapHalfExtent) & (
+                        part_state[:, 1] > -0.8*self.mapHalfExtent) & (part_state[:, 1] < 0.8*self.mapHalfExtent) & (part_height<0.2)]
+            filtered_heights = part_height[(part_state[:, 0] > -0.8*self.mapHalfExtent) & (part_state[:, 0] < 0.8*self.mapHalfExtent) & (
+                        part_state[:, 1] > -0.8*self.mapHalfExtent) & (part_state[:, 1] < 0.8*self.mapHalfExtent) & (part_height<0.2)]
 
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
                                               filtered_heights,width=1.5)
@@ -147,10 +147,10 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             part_height_p = prev_part_heights[i]
 
             filtered_parts = part_state[
-                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
-            filtered_heights = part_height[(part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent) & (part_height<0.2)]
+                (part_state[:, 0] > -0.8*self.mapHalfExtent) & (part_state[:, 0] < 0.8*self.mapHalfExtent) & (
+                        part_state[:, 1] > -0.8*self.mapHalfExtent) & (part_state[:, 1] < 0.8*self.mapHalfExtent) & (part_height<0.2)]
+            filtered_heights = part_height[(part_state[:, 0] > -0.8*self.mapHalfExtent) & (part_state[:, 0] < 0.8*self.mapHalfExtent) & (
+                        part_state[:, 1] > -0.8*self.mapHalfExtent) & (part_state[:, 1] < 0.8*self.mapHalfExtent) & (part_height<0.2)]
 
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
                                               filtered_heights,width=1.5)
