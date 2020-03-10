@@ -78,7 +78,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =2
+        self.currCurriculum =3
         print("Plastic Goal Sweeping")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -175,7 +175,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
             if(dist<1):
                 self.stage[i] = 1
-                target_dist_curr[i] = 0.3+20*(prev_distances_center_1[i]-curr_distances_center_1[i]) + part_movement_rwd[i]
+                target_dist_curr[i] = 0.3+20*(prev_distances_center_1[i]-curr_distances_center_1[i]) #+ part_movement_rwd[i]
             else:
                 self.stage[i] = 0
                 target_dist_curr[i] = -0.1*dist
@@ -303,7 +303,7 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
     def _reset(self):
 
-        if(np.mean(self.rolloutRet) > 400):
+        if(np.mean(self.rolloutRet) > 300):
             self.currCurriculum=min(3,self.currCurriculum+1)
 
         print("Current Curriculum Level: ", self.currCurriculum)     

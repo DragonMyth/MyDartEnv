@@ -40,7 +40,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -60,7 +60,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
-        self.innerRatio = 1.0
+        self.innerRatio = 0.7
         self.minHeight =0.18
         print("With Height Map Attraction. X Y Axis of Rotation")
 
@@ -139,7 +139,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         part_movement_rwd = np.zeros((self.numInstances))
 
-        curr_outlier_cnt = np.zeros((self.numInstances))
+        curr_outlier_dist = np.zeros((self.numInstances))
         for i in range(self.numInstances):
             part_state = curr_part_state[i]
             part_height = curr_part_heights[i]
@@ -156,14 +156,16 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
                                               filtered_heights,width=1.5)
 
             outliers = part_state[
-                (part_state[:, 0] < -self.mapHalfExtent) | (part_state[:, 0] > self.mapHalfExtent) | (
-                        part_state[:, 1] < -self.mapHalfExtent) | (part_state[:, 1] > self.mapHalfExtent)]
+                (part_state[:, 0] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 0] > self.innerRatio*self.mapHalfExtent) | (
+                        part_state[:, 1] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 1] > self.innerRatio*self.mapHalfExtent)]
             curr_untransformed_height[i] = height.flatten()
 
             part_movement = np.linalg.norm(part_state_p-part_state,axis=1)
             part_movement[part_height_p<0.2] *=-50
             part_movement_rwd[i] = np.mean(part_movement,axis=0)
-            curr_outlier_cnt[i] = outliers.shape[0]
+
+            if(outliers.shape[0]>0):
+                curr_outlier_dist[i] = np.sum(np.linalg.norm(np.abs(outliers)-self.innerRatio*self.mapHalfExtent,axis=1))
         # curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
 
         curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
@@ -212,8 +214,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
-        rewards = 0.1*part_movement_rwd+0.01*(curr_height_cnt-prev_height_cnt) - 0.5*curr_outlier_cnt + height_min_rwd
-        # print(self.stage[0])
+        rewards = 0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd - 0.005*curr_outlier_dist #+ height_min_rwd
+        # print(0.001*curr_outlier_dist)
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
