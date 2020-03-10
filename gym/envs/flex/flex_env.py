@@ -114,7 +114,9 @@ class FlexEnv(gym.Env):
         state = pyFlex.resetScene()
         palceholder_act = np.zeros((self.numInstances,7))
         palceholder_act[:,-1] = 1
-        self.do_simulation(palceholder_act, 100)
+        self.do_simulation(palceholder_act, 200)
+
+        
         return state
     def get_state(self):
         state_vec = pyFlex.get_state()

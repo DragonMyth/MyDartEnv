@@ -21,8 +21,8 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        self.direct_info_dim = 12
-        obs_size = self.resolution * self.resolution * 2 + self.direct_info_dim
+        self.direct_info_dim = 10
+        obs_size = self.resolution * self.resolution  + self.direct_info_dim
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -32,14 +32,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5,2,5])
-        action_bound = np.array([[-7, -7, -7, -np.pi / 2,-np.pi / 2], [
-            7, 7, 7, np.pi / 2,np.pi / 2]])
+        self.clusterDim = np.array([3,3,3])
+        action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
+            10, 10, 10, np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -47,7 +47,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 0.7, 0.01])
+        self.barDim = np.array([1.7, 0.01, 1.7])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
 
@@ -60,8 +60,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
-        self.minHeight = 0.2
-        print("With Height Map Attraction. X Y Axis of Rotation")
+        print("============================================Flipping================================================")
 
     def angle_to_rot_matrix(self, angles):
         rot_vec = np.ones((self.numInstances, 2, 2))
@@ -103,11 +102,10 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = prev_bar_state[:, 1, 0] + action[:, 3]
-        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 4]
+        flex_action[:, 4] = 0
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
 
-        prev_height_sum = (np.mean(prev_part_heights, axis=1))
 
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
@@ -116,58 +114,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         obs = self._get_obs()
 
-        untransformed_density = np.zeros((self.numInstances, self.resolution * self.resolution))
-        untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
+        height_diff = np.min(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
 
-        for i in range(self.numInstances):
-            part_state = curr_part_state[i]
 
-            filtered_parts = part_state[
-                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+        height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
+        height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.1,0)
 
-            density = self.get_particle_density(
-                filtered_parts, np.array([[0, 0, 0]]), np.identity(2), normalized=True)
-
-            height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
-                                              curr_part_heights[i])
-            untransformed_density[i] = density.flatten()
-            untransformed_height[i] = height.flatten()
-
-        maxFlatIdx = np.argmax(untransformed_height, axis=1)
-        maxI = (maxFlatIdx / self.resolution).astype(int)
-        maxJ = maxFlatIdx - self.resolution * maxI
-
-        posX = np.expand_dims((maxJ + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
-        posY = np.expand_dims((maxI + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
-
-        densePos = np.concatenate([posX, posY], axis=1)
-        # transformed_densePos = np.matmul()
-        to_bar_dist_curr = (np.linalg.norm(densePos - curr_bar_state[:, 0, (0, 2)], axis=1)) ** 2
-
-        part_movement_rwd = np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1)
-        part_movement_rwd = (1 - np.exp(-40 * part_movement_rwd))
-
-        curr_height_sum = (np.mean(curr_part_heights, axis=1))
-
-        # print(1-np.exp(-40*part_movement_rwd))
-        target_dist_curr = np.zeros(self.numInstances)
-        # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
-        # for i in range(self.numInstances):
-        #     dist= to_bar_dist_curr[i]
-        #     if(dist<=2):
-        #         self.stage[i]  =  0
-        #         target_dist_curr[i] = 0.4*np.clip(np.exp(3*(-curr_height_sum[i])),0,1)+0.6*(1-np.exp(-40*part_movement_rwd[i]))
-
-        #     else:
-        #         self.stage[i]  =  1
-        #         target_dist_curr[i] = -0.1*np.exp(0.02*(dist-2))
-        # print(1 - curr_height_sum)
-        height_min_rwd = (1 - np.clip(np.exp(- (0.8 - curr_height_sum)),0,2))
-        # height_min_rwd = 50*(prev_height_sum - curr_height_sum)
-
-        rewards = 1 * height_min_rwd + 0 * part_movement_rwd
+        
+        rewards = height_diff
 
         # print(self.stage[0])
         self.rolloutRet += rewards
@@ -175,7 +129,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             'Total Reward': rewards[0],
 
         }
-        reward_decomp = [rewards[0], 1 * height_min_rwd[0], 0 * part_movement_rwd[0]]
+        reward_decomp = [0,0,0]
         if (len(self.rwdBuffer) >= 100):
             self.rwdBuffer.pop(0)
         self.rwdBuffer.append(reward_decomp)
@@ -219,15 +173,12 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             bar_pos = bar_state[0]  # 3
             bar_ang_x = np.array([np.cos(bar_state[1, 0]), np.sin(bar_state[1, 0])])  # 2
 
-            bar_ang_y = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])  # 2
-
             bar_vel = bar_state[2]  # 3
-            bar_ang_vel_x = np.array([bar_state[3, 0]])  # 1
-            bar_ang_vel_y = np.array([bar_state[3, 1]])  # 1
+            bar_ang_vel_x = np.array([np.cos(bar_state[3, 0]), np.sin(bar_state[3, 0])])  # 2
 
-            bar_info = np.concatenate([bar_pos, bar_ang_x,bar_ang_y, bar_vel, bar_ang_vel_x,bar_ang_vel_y])
+            bar_info = np.concatenate([bar_pos, bar_ang_x, bar_vel, bar_ang_vel_x])
             obs = np.concatenate(
-                [bar_info, density.flatten(), height_map.flatten()
+                [bar_info, height_map.flatten()
                  ])
 
             obs_list.append(obs)
@@ -257,6 +208,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         if (particles.shape[0] == 0):
             return np.zeros((self.resolution, self.resolution))
         particles -= bar_state[0, (0, 2)]
+        heights-=bar_state[0, 1]
 
         particles = np.matmul(particles, rot.transpose())
 
@@ -305,9 +257,11 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
                 for j in range(self.numInitClusters):
                     self.initClusterparam[i, (j * 6, j * 6 + 2)
                     ] = self.idxPool[indices[j]] * 2.5
+                    self.initClusterparam[i,j*6+1] = 3
                     self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
 
                 self.setInitClusterParam(self.initClusterparam)
+
 
         flex_env.FlexEnv._reset(self)
 
@@ -315,12 +269,12 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         self.setMapHalfExtent(self.mapHalfExtent)
 
         pos = np.zeros((self.numInstances, 3))
-        pos[:,2] = -0.4
+        # pos[:,2] = -0.4
         # pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
         rot = np.zeros((self.numInstances, 3))
-        rot[:,0] = np.pi/2
+        # rot[:,0] = np.pi/2
 
         rot[:, 2] = 0  # Do not control the z axis rotation
 
@@ -385,11 +339,11 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         ll = surfaces[2]
         lr = surfaces[3]
 
-        part_map = obs[0, 9:9 + self.resolution * self.resolution]
-        goal_map = obs[0, 9 + self.resolution * self.resolution:9 +
+        part_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
+        goal_map = obs[0, self.direct_info_dim + self.resolution * self.resolution:self.direct_info_dim +
                                                                 2 * (self.resolution * self.resolution)]
         particle_goal_map = obs[0,
-                            9 + 2 * self.resolution * self.resolution:9 + 3 * (self.resolution * self.resolution)]
+                            self.direct_info_dim + 2 * self.resolution * self.resolution:self.direct_info_dim + 3 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
 
@@ -427,22 +381,19 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
 
-        part_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
+        height_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
 
-        part_map = np.reshape(
-            part_map, (self.resolution, self.resolution)).astype(np.float64)
-
-        height_map = obs[0,
-                     self.direct_info_dim + self.resolution * self.resolution:self.direct_info_dim + 2 * self.resolution * self.resolution]
         height_map = np.reshape(
             height_map, (self.resolution, self.resolution)).astype(np.float64)
+
+
         # self.draw_grid(tl, bar_map, 0, 1)
         self.live_rwd(tl, self.rwdBuffer)
         # self.draw_grid(tr, goal_map, 0, 1)
         # self.live_pc(ll,self.curr_pc)
         self.draw_grid(ll, height_map, 0, 1)
 
-        self.draw_grid(lr, part_map, 0, 1)
+        # self.draw_grid(lr, part_map, 0, 1)
         #
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() /
@@ -534,9 +485,17 @@ if __name__ == '__main__':
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 5))
+        act = np.zeros((49, 4))
         # act[:, 0]=0
-        act[:, 1] = 1
+
+        if(i%100<30):
+            act[:, 1] = 1
+
+            # act[:, 3] = 1
+
+        else:
+            act[:, 1] = -1
+            # act[:, 3] = -1
         # act[:, 2] = 0
         # act[:, 3] = -1
         # act[:, 4] = 1

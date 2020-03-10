@@ -622,6 +622,12 @@ register(
     max_episode_steps=500,
 )
 
+register(
+    id='FlexPlasticReshaping-v4',
+    entry_point='gym.envs.flex:PlasticFlippingEnv',
+    max_episode_steps=200,
+)
+
 
 # Atari
 # ----------------------------------------
