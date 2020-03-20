@@ -22,7 +22,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.resolution = 32
         self.direct_info_dim = 10
-        obs_size = self.resolution * self.resolution  + self.direct_info_dim
+        obs_size = self.resolution * self.resolution *2 + self.direct_info_dim
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -32,7 +32,11 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
+<<<<<<< HEAD
         self.clusterDim = np.array([5,3,5])
+=======
+        self.clusterDim = np.array([6,6,6])
+>>>>>>> c5623a57880fbaf753c17161c3312356bf70b194
         action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
             10, 10, 10, np.pi / 2]])
 
@@ -73,7 +77,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
     def _step(self, action):
         action = action * self.action_scale
-        prev_bar_state, prev_part_state, prev_part_heights = self.get_state()
+        prev_bar_state, prev_part_state, prev_part_heights,prev_part_temp = self.get_state()
 
         rot_mat = self.angle_to_rot_matrix(action[:, 3])
 
@@ -110,20 +114,24 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
 
-        curr_bar_state, curr_part_state, curr_part_heights = self.get_state()
+        curr_bar_state, curr_part_state, curr_part_heights,curr_part_temp = self.get_state()
 
         obs = self._get_obs()
 
         height_diff = np.mean(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
 
 
+        total_heat = np.zeros(self.numInstances)
+        for i in range(self.numInstances):
+            heat = curr_part_temp[i]
+            total_heat[i] = np.sum(heat[(heat>0.7) & (heat<1.3)])/heat.shape[0]
+
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.1,0)
 
-        
-        rewards = height_diff
 
-        # print(self.stage[0])
+        rewards = height_diff+total_heat
+
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
@@ -138,7 +146,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
     def _get_obs(self):
 
-        bar_states, part_states, part_heights = self.get_state()
+        bar_states, part_states, part_heights,part_temps = self.get_state()
         obs_list = []
 
         for i in range(self.numInstances):
@@ -148,7 +156,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
             part_height = part_heights[i]
-
+            part_temp = part_temps[i]
             bar_state = bar_states[i]
 
             bar_y_rot_vec = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])
@@ -162,7 +170,9 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             density = self.get_particle_density(
                 part_state, bar_state, bar_rot, normalized=True)
 
-            height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height)
+            height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height-bar_state[0, 1])
+
+            temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
 
             # if(i==0):
             #     import matplotlib.pyplot as plt
@@ -178,7 +188,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             bar_info = np.concatenate([bar_pos, bar_ang_x, bar_vel, bar_ang_vel_x])
             obs = np.concatenate(
-                [bar_info, height_map.flatten()
+                [bar_info, height_map.flatten(),temp_map.flatten()
                  ])
 
             obs_list.append(obs)
@@ -208,7 +218,6 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         if (particles.shape[0] == 0):
             return np.zeros((self.resolution, self.resolution))
         particles -= bar_state[0, (0, 2)]
-        heights-=bar_state[0, 1]
 
         particles = np.matmul(particles, rot.transpose())
 
@@ -227,10 +236,16 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
-        part_state = full_state[:, 4::, (0, 2)]
+        numPart =  (full_state.shape[1]-4)//2  
+        part_state = full_state[:, 4:4+numPart, (0, 2)]
+        
+        part_temp = full_state[:, 4+numPart:4+2*numPart, 0]
+
         bar_state = full_state[:, :4, :]
-        part_heights = full_state[:, 4::, 1]
-        return bar_state, part_state, part_heights
+
+        part_heights = full_state[:, 4:4+numPart, 1]
+
+        return bar_state, part_state, part_heights, part_temp
 
     def _reset(self):
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
@@ -382,9 +397,13 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         lr.fill([200, 200, 200])
 
         height_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
+        heat_map = obs[0, self.direct_info_dim+ self.resolution * self.resolution:self.direct_info_dim + self.resolution * self.resolution*2]
 
         height_map = np.reshape(
             height_map, (self.resolution, self.resolution)).astype(np.float64)
+
+        heat_map = np.reshape(
+            heat_map, (self.resolution, self.resolution)).astype(np.float64)
 
 
         # self.draw_grid(tl, bar_map, 0, 1)
@@ -393,7 +412,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         # self.live_pc(ll,self.curr_pc)
         self.draw_grid(ll, height_map, 0, 1)
 
-        # self.draw_grid(lr, part_map, 0, 1)
+        self.draw_grid(lr, heat_map, 0, 1)
         #
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() /
@@ -485,7 +504,7 @@ if __name__ == '__main__':
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 4))
+        act = np.zeros((1, 4))
         # act[:, 0]=0
 
         if(i%100<30):
@@ -495,7 +514,7 @@ if __name__ == '__main__':
 
         else:
             act[:, 1] = -1
-            # act[:, 3] = -1
+            act[:, 3] = -1
         # act[:, 2] = 0
         # act[:, 3] = -1
         # act[:, 4] = 1
