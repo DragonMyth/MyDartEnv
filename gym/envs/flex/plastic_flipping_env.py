@@ -32,7 +32,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([3,3,3])
+        self.clusterDim = np.array([5,3,5])
         action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
             10, 10, 10, np.pi / 2]])
 
@@ -47,7 +47,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([1.7, 0.01, 1.7])
+        self.barDim = np.array([1.5, 2.0, 0.5])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
 
@@ -114,7 +114,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         obs = self._get_obs()
 
-        height_diff = np.min(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
+        height_diff = np.mean(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
 
 
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10

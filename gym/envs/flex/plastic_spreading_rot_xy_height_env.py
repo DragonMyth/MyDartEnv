@@ -60,7 +60,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
-        self.innerRatio = 0.7
+        self.innerRatio = 0.9
         self.minHeight =0.18
         print("With Height Map Attraction. X Y Axis of Rotation")
 
@@ -214,7 +214,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
-        rewards = 0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd - 0.005*curr_outlier_dist #+ height_min_rwd
+        rewards = 0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.05*curr_outlier_dist #+ height_min_rwd
         # print(0.001*curr_outlier_dist)
         self.rolloutRet += rewards
         info = {
