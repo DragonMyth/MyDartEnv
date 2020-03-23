@@ -40,7 +40,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -60,7 +60,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
-        self.innerRatio = 0.9
+        self.innerRatio = 0.7
         self.minHeight =0.18
         print("With Height Map Attraction. X Y Axis of Rotation")
 
@@ -108,7 +108,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
 
-        prev_height_sum = (np.mean(prev_part_heights, axis=1))
+        prev_height_sum = (np.min(prev_part_heights, axis=1))
 
         prev_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
       
@@ -193,7 +193,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         #     (curr_part_state - prev_part_state), axis=2), axis=1)
 
             
-        curr_height_sum = (np.mean(curr_part_heights, axis=1))
+        curr_height_sum = (np.min(curr_part_heights, axis=1))
 
         # print(1-np.exp(-40*part_movement_rwd))
         target_dist_curr = np.zeros(self.numInstances)
@@ -214,7 +214,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
-        rewards = 0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.05*curr_outlier_dist #+ height_min_rwd
+        rewards = 0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.01*curr_outlier_dist #+ height_min_rwd
         # print(0.001*curr_outlier_dist)
         self.rolloutRet += rewards
         info = {

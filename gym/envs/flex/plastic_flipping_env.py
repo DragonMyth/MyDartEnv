@@ -32,18 +32,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-<<<<<<< HEAD
-        self.clusterDim = np.array([5,3,5])
-=======
-        self.clusterDim = np.array([6,6,6])
->>>>>>> c5623a57880fbaf753c17161c3312356bf70b194
+        self.clusterDim = np.array([5,5,5])
         action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
             10, 10, 10, np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -51,7 +47,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([1.5, 2.0, 0.5])
+        self.barDim = np.array([1.5, 2.0, 3.5])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
 
@@ -118,19 +114,24 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         obs = self._get_obs()
 
-        height_diff = np.mean(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
+        height_diff = np.min(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
 
 
         total_heat = np.zeros(self.numInstances)
         for i in range(self.numInstances):
             heat = curr_part_temp[i]
-            total_heat[i] = np.sum(heat[(heat>0.7) & (heat<1.3)])/heat.shape[0]
+            diff = np.abs(heat-1)
+            diff_cpy = diff.copy()
+            diff[diff_cpy<0.3]=0.1
 
-        height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
-        height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.1,0)
+            diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
 
+            total_heat[i] = np.mean(diff)
 
-        rewards = height_diff+total_heat
+        height_diff[height_diff>0] = 0.05+height_diff[height_diff>0]*10
+        height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
+
+        rewards = total_heat
 
         self.rolloutRet += rewards
         info = {
@@ -272,7 +273,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
                 for j in range(self.numInitClusters):
                     self.initClusterparam[i, (j * 6, j * 6 + 2)
                     ] = self.idxPool[indices[j]] * 2.5
-                    self.initClusterparam[i,j*6+1] = 3
+                    self.initClusterparam[i,j*6+1] = 6
                     self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
 
                 self.setInitClusterParam(self.initClusterparam)
