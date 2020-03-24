@@ -108,7 +108,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
 
-        prev_height_sum = (np.min(prev_part_heights, axis=1))
+        prev_height_sum = (np.max(prev_part_heights, axis=1))
 
         prev_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
       
@@ -193,7 +193,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         #     (curr_part_state - prev_part_state), axis=2), axis=1)
 
             
-        curr_height_sum = (np.min(curr_part_heights, axis=1))
+        curr_height_sum = (np.max(curr_part_heights, axis=1))
 
         # print(1-np.exp(-40*part_movement_rwd))
         target_dist_curr = np.zeros(self.numInstances)

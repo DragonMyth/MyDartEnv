@@ -110,6 +110,7 @@ class FlexEnv(gym.Env):
 
 
     def _reset(self):
+        # print("ASFASFASFASF")
         # self._seed(self.seed)
         state = pyFlex.resetScene()
         palceholder_act = np.zeros((self.numInstances,7))

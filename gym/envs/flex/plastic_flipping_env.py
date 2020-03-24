@@ -32,9 +32,9 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5,5,5])
-        action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
-            10, 10, 10, np.pi / 2]])
+        self.clusterDim = np.array([6,3,6])
+        action_bound = np.array([[-12, -12, -12, -np.pi / 2], [
+            12, 12, 12, np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
@@ -47,7 +47,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([1.5, 2.0, 3.5])
+        self.barDim = np.array([1.5, 2.0, 0.5])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
 
@@ -107,6 +107,18 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         flex_action[:, 6] = 0
 
 
+
+        prev_total_heat = np.zeros(self.numInstances)
+        for i in range(self.numInstances):
+            heat = prev_part_temp[i]
+            # diff = np.abs(heat-1)
+            # diff_cpy = diff.copy()
+            # diff[diff_cpy<0.3]=1
+
+            # diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
+
+            prev_total_heat[i] = np.sum(heat)
+
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
 
@@ -117,22 +129,22 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         height_diff = np.min(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
 
 
-        total_heat = np.zeros(self.numInstances)
+        curr_total_heat = np.zeros(self.numInstances)
         for i in range(self.numInstances):
             heat = curr_part_temp[i]
-            diff = np.abs(heat-1)
-            diff_cpy = diff.copy()
-            diff[diff_cpy<0.3]=0.1
+            # diff = np.abs(heat-1)
+            # diff_cpy = diff.copy()
+            # diff[diff_cpy<0.3]=1
 
-            diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
+            # diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
 
-            total_heat[i] = np.mean(diff)
+            curr_total_heat[i] = np.sum(heat)
 
         height_diff[height_diff>0] = 0.05+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
 
-        rewards = total_heat
-
+        # rewards =height_diff+ 5*total_heat
+        rewards = curr_total_heat-prev_total_heat
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
