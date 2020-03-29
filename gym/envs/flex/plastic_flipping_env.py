@@ -39,7 +39,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -142,9 +142,13 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
-
+        
+        if(self.currCurriculum==0):
         # rewards =height_diff+ 5*total_heat
-        rewards = height_diff#+5*(curr_total_heat-prev_total_heat)
+            rewards = 0.1*height_diff#+5*(curr_total_heat-prev_total_heat)
+        else:
+            rewards = 5*(curr_total_heat-prev_total_heat)
+
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
@@ -165,11 +169,13 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         for i in range(self.numInstances):
             stage = self.stage[i]
             part_state = part_states[i]
-            part_state = part_state[
-                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+            valid_idx = (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)
+            part_state = part_state[valid_idx]
             part_height = part_heights[i]
+            part_height = part_height[valid_idx]
             part_temp = part_temps[i]
+            part_temp = part_temp[valid_idx]
             bar_state = bar_states[i]
 
             bar_y_rot_vec = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])
@@ -187,6 +193,10 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
 
+            # temp_map_lower = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])<0.3], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])<0.3])
+            # temp_map_higher = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])>0.3], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])>0.3])
+
+            # temp_map = 0.3*temp_map_higher+0.7*temp_map_lower
             # if(i==0):
             #     import matplotlib.pyplot as plt
             #     plt.figure()
@@ -265,6 +275,9 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         print("Return at current rollout: ", self.rolloutRet)
         print("Mean Return at current rollout: ", np.mean(self.rolloutRet))
+        print("Current Curriculum: ",self.currCurriculum)
+        if(np.mean(self.rolloutRet>100)):
+            self.currCurriculum = 1
 
         self.rolloutRet = np.zeros(self.numInstances)
         if self.randomCluster:
