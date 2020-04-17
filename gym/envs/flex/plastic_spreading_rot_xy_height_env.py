@@ -33,7 +33,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([10,10,10])
+        self.clusterDim = np.array([5,5,5])
         action_bound = np.array([[-8, -8, -8, -np.pi / 2,-np.pi / 2], [
             8, 8, 8, np.pi / 2,np.pi / 2]])
 
@@ -61,7 +61,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
         self.innerRatio = 0.8
-        self.minHeight =0.09
+        self.minHeight =0.18
         print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
@@ -97,13 +97,17 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             action[i, (0, 2)] = targ_pos_trans
 
             transformed_action[i, 0:3] = action[i, 0:3] + prev_bar_state[i, 0]
+            transformed_xz_velocity = bar_rot @ prev_bar_state[i,2,(0,2)]
+            
+            # Constraining the rotation to be velocity aligned
+            target_x_rot = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/3,0) if transformed_xz_velocity[1]<0 else np.clip(prev_bar_state[i, 1, 0] + action[i, 3],0,np.pi/3)
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
         flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
-        flex_action[:, 3] = np.clip(prev_bar_state[:, 1, 0] + action[:, 3],-np.pi/3,np.pi/3)
+        flex_action[:, 3] = target_x_rot
         flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 4]
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
@@ -304,8 +308,9 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
                              width, self.mapHalfExtent)
 
         if normalized:
-            H = H ** (1.0 / 2)
-            H = H / (50)
+            # H = H ** (1.0 / 2)
+            # H = H / (50)
+            H = H / (200)
             H = np.clip(H, 0, 1)
         return H
 
@@ -381,8 +386,11 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # pos[:,2] = -0.7
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
-        rot = np.random.uniform(-np.pi/3, np.pi/3, (self.numInstances, 3))
+        rot = np.random.uniform(-1, 1, (self.numInstances, 3))
+        # rot = np.random.uniform(-0.01, 0.01, (self.numInstances, 3))
 
+        rot[:,0] *= 0.01
+        rot[:,1] *= np.pi/2
         rot[:, 2] = 0  # Do not control the z axis rotation
         # pos = np.zeros((self.numInstances, 2))
         # pos[:, 0] = -1.8
@@ -598,7 +606,7 @@ if __name__ == '__main__':
         # act[:, 0]=0
         # act[:, 1] = 1
         act[:, 2] = -1
-        # act[:, 3] = 0
+        act[:, 3] = -1
         # act[:, 4] = 1
 
         # act[:, -1] = 1
