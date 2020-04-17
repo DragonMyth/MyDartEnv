@@ -39,7 +39,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -121,7 +121,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             # diff[diff_cpy<0.3]=1
 
             # diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
-            prev_total_heat_cnt[i] = heat[height>0.2].shape[0]
+            prev_total_heat_cnt[i] = heat[heat>0.5].shape[0]
             prev_total_heat[i] = np.sum(heat[height>0.2])
 
         # Simulation
@@ -145,17 +145,20 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             # diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
 
-            curr_total_heat_cnt[i] = heat[height>0.2].shape[0]
+            curr_total_heat_cnt[i] = heat[heat>0.5].shape[0]
             curr_total_heat[i] = np.sum(heat[height>0.2])
 
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
+
         if(self.currCurriculum==0):
-        # rewards =height_diff+ 5*total_heat
+            # # rewards =height_diff+ 5*total_heat
             rewards = 0.1*height_diff#+5*(curr_total_heat-prev_total_heat)
         else:
-            rewards = (curr_total_heat_cnt-prev_total_heat_cnt)+5*np.clip((curr_total_heat-prev_total_heat),0,2)
-
+            rewards = np.clip(curr_total_heat_cnt-prev_total_heat_cnt,0,np.max(curr_total_heat_cnt-prev_total_heat_cnt))#+5*np.clip((curr_total_heat-prev_total_heat),0,2)
+        
+        # print(curr_total_heat_cnt)
+        rewards =  0.1*height_diff+np.clip(curr_total_heat_cnt-prev_total_heat_cnt,0,np.max(curr_total_heat_cnt-prev_total_heat_cnt))
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
@@ -198,12 +201,12 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height-bar_state[0, 1])
 
-            # temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
+            temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
 
-            temp_map_lower = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])<0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])<0.2])
-            temp_map_higher = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])>0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])>0.2])
+            # temp_map_lower = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])<0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])<0.2])
+            # temp_map_higher = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])>0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])>0.2])
 
-            temp_map = 0.3*temp_map_higher+0.7*temp_map_lower
+            # temp_map = 0.3*temp_map_higher+0.7*temp_map_lower
             # if(i==0):
             #     import matplotlib.pyplot as plt
             #     plt.figure()

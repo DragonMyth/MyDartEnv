@@ -33,7 +33,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5,5,5])
+        self.clusterDim = np.array([10,10,10])
         action_bound = np.array([[-8, -8, -8, -np.pi / 2,-np.pi / 2], [
             8, 8, 8, np.pi / 2,np.pi / 2]])
 
@@ -61,7 +61,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
         self.innerRatio = 0.8
-        self.minHeight =0.18
+        self.minHeight =0.09
         print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
@@ -304,8 +304,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
                              width, self.mapHalfExtent)
 
         if normalized:
-            # H = H ** (1.0 / 2)
-            H = H / (200)
+            H = H ** (1.0 / 2)
+            H = H / (50)
             H = np.clip(H, 0, 1)
         return H
 
