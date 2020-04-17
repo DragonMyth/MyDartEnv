@@ -39,7 +39,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -198,12 +198,12 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height-bar_state[0, 1])
 
-            # temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
+            temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
 
-            temp_map_lower = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])<0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])<0.2])
-            temp_map_higher = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])>0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])>0.2])
+            # temp_map_lower = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])<0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])<0.2])
+            # temp_map_higher = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])>0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])>0.2])
 
-            temp_map = 0.3*temp_map_higher+0.7*temp_map_lower
+            # temp_map = 0.3*temp_map_higher+0.7*temp_map_lower
             # if(i==0):
             #     import matplotlib.pyplot as plt
             #     plt.figure()
