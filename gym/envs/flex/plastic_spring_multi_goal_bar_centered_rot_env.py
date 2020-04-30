@@ -39,15 +39,15 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-7, -7, -np.pi / 2], [
-           7, 7, np.pi / 2]])
-        # action_bound = np.array([[-4, -4, -np.pi / 2,-1], [
-        #     4, 4, np.pi / 2,-1]])
+        # action_bound = np.array([[-7, -7, -np.pi / 2], [
+        #    7, 7, np.pi / 2]])
+        action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
+        7, 7, np.pi / 2,-1]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -58,12 +58,12 @@ class PlasticSpringMultiGoalBarCenteredRotEnv(flex_env.FlexEnv):
 
         # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
-        # self.center_list = np.random.uniform(-3, 3, (100, 2))
+        self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -546,7 +546,7 @@ if __name__ == '__main__':
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 3))
+        act = np.zeros((49,4))
         # act[:, 0] = 0
         act[:, 1] = -1
 

@@ -22,7 +22,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.resolution = 32
         self.direct_info_dim = 10
-        obs_size = self.resolution * self.resolution *2 + self.direct_info_dim
+        obs_size = self.resolution * self.resolution *1 + self.direct_info_dim
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
@@ -32,7 +32,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5,3,5])
+        self.clusterDim = np.array([7,2,7])
         action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
             10, 10, 10, np.pi / 2]])
 
@@ -169,7 +169,9 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             rewards = np.clip(curr_total_heat_cnt-prev_total_heat_cnt,0,np.max(curr_total_heat_cnt-prev_total_heat_cnt))#+5*np.clip((curr_total_heat-prev_total_heat),0,2)
         
         # print(curr_total_heat_cnt)
-        rewards =  0.1*height_diff+np.clip(curr_total_heat_cnt-prev_total_heat_cnt,0,np.max(curr_total_heat_cnt-prev_total_heat_cnt))
+        # rewards =  0.1*height_diff+np.clip(curr_total_heat_cnt-prev_total_heat_cnt,0,np.max(curr_total_heat_cnt-prev_total_heat_cnt))+ang_vels
+        rewards =  0.1*height_diff+3*ang_vels
+
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
@@ -212,7 +214,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height-bar_state[0, 1])
 
-            temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
+            # temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
 
             # temp_map_lower = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])<0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])<0.2])
             # temp_map_higher = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])>0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])>0.2])
@@ -232,7 +234,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             bar_info = np.concatenate([bar_pos, bar_ang_x, bar_vel, bar_ang_vel_x])
             obs = np.concatenate(
-                [bar_info, height_map.flatten(),temp_map.flatten()
+                [bar_info, height_map.flatten()
                  ])
 
             obs_list.append(obs)
