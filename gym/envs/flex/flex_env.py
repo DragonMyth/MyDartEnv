@@ -147,6 +147,8 @@ class FlexEnv(gym.Env):
         return pyFlex.getParticleHeightMap(particles,heights,resolution,width,mapHalfExtent)
     def get_angular_vel_flex(self,prev_parts,curr_parts):
         return pyFlex.getParticleAngularVelocity(prev_parts,curr_parts)
+    def set_aux_info(self,auxInfo):
+        return pyFlex.setAuxInfo(auxInfo)
     def _render(self, mode='human', close=False):
         if(self.viewerId==2):
             # pg.display.update()

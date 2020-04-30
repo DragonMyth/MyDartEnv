@@ -137,6 +137,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         curr_total_heat = np.zeros(self.numInstances)
         curr_total_heat_cnt = np.zeros(self.numInstances)
         ang_vels = np.zeros(self.numInstances)
+        ang_vels_full = np.zeros((self.numInstances,3))
         for i in range(self.numInstances):
             heat = curr_part_temp[i]
             height = height_diff[i]
@@ -153,8 +154,11 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             currParts = np.concatenate([curr_part_state[i,:,0,np.newaxis],curr_part_heights[i,:,np.newaxis],curr_part_state[i,:,1,np.newaxis]],axis=1)
 
             ang_vel = self.get_angular_vel(prevParts,currParts)
+            ang_vels_full[i] = ang_vel
             ang_vel_proj = np.dot(ang_vel,np.array([0,0,1]))**2
             ang_vels[i] = ang_vel_proj
+
+        self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
 
