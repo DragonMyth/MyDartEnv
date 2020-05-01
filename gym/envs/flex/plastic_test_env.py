@@ -39,7 +39,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=9, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=9, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -448,13 +448,13 @@ class PlasticTestEnv(flex_env.FlexEnv):
         lr.fill([200, 200, 200])
 
         height_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
-        heat_map = obs[0, self.direct_info_dim+ self.resolution * self.resolution:self.direct_info_dim + self.resolution * self.resolution*2]
+        # heat_map = obs[0, self.direct_info_dim+ self.resolution * self.resolution:self.direct_info_dim + self.resolution * self.resolution*2]
 
         height_map = np.reshape(
             height_map, (self.resolution, self.resolution)).astype(np.float64)
 
-        heat_map = np.reshape(
-            heat_map, (self.resolution, self.resolution)).astype(np.float64)
+        # heat_map = np.reshape(
+        #     heat_map, (self.resolution, self.resolution)).astype(np.float64)
 
 
         # self.draw_grid(tl, bar_map, 0, 1)
@@ -463,7 +463,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         # self.live_pc(ll,self.curr_pc)
         self.draw_grid(ll, height_map, 0, 1)
 
-        self.draw_grid(lr, heat_map, 0, 1)
+        # self.draw_grid(lr, heat_map, 0, 1)
         #
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() /

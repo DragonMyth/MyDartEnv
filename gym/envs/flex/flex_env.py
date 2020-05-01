@@ -145,8 +145,8 @@ class FlexEnv(gym.Env):
         return pyFlex.getParticleDensity(particles, resolution,width,mapHalfExtent)
     def get_height_map(self,particles,heights,resolution,width,mapHalfExtent):
         return pyFlex.getParticleHeightMap(particles,heights,resolution,width,mapHalfExtent)
-    def get_angular_vel_flex(self,prev_parts,curr_parts):
-        return pyFlex.getParticleAngularVelocity(prev_parts,curr_parts)
+    def get_angular_vel_flex(self,partPos,partVel):
+        return pyFlex.getParticleAngularVelocity(partPos,partVel)
     def set_aux_info(self,auxInfo):
         return pyFlex.setAuxInfo(auxInfo)
     def _render(self, mode='human', close=False):

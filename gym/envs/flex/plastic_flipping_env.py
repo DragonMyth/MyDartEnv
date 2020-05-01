@@ -39,7 +39,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -73,7 +73,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
     def _step(self, action):
         action = action * self.action_scale
-        prev_bar_state, prev_part_state, prev_part_heights,prev_part_temp = self.get_state()
+        prev_bar_state, prev_part_state, prev_part_heights,prev_part_vel = self.get_state()
 
         rot_mat = self.angle_to_rot_matrix(action[:, 3])
 
@@ -107,27 +107,13 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         flex_action[:, 6] = 0
 
 
-
-        prev_total_heat = np.zeros(self.numInstances)
-        prev_total_heat_cnt = np.zeros(self.numInstances)
         prev_height_diff = np.min(prev_part_heights,axis=1)-prev_bar_state[:,0,1]
 
-        for i in range(self.numInstances):
-            heat = prev_part_temp[i]
-            height = prev_height_diff[i]
-
-            # diff = np.abs(heat-1)
-            # diff_cpy = diff.copy()
-            # diff[diff_cpy<0.3]=1
-
-            # diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
-            prev_total_heat_cnt[i] = heat[heat>0.5].shape[0]
-            prev_total_heat[i] = np.sum(heat[height>0.2])
-
+      
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
 
-        curr_bar_state, curr_part_state, curr_part_heights,curr_part_temp = self.get_state()
+        curr_bar_state, curr_part_state, curr_part_heights,curr_part_vels = self.get_state()
 
         obs = self._get_obs()
 
@@ -139,21 +125,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         ang_vels = np.zeros(self.numInstances)
         ang_vels_full = np.zeros((self.numInstances,3))
         for i in range(self.numInstances):
-            heat = curr_part_temp[i]
             height = height_diff[i]
-            # diff = np.abs(heat-1)
-            # diff_cpy = diff.copy()
-            # diff[diff_cpy<0.3]=1
 
-            # diff[diff_cpy>=0.3]=-(diff[diff_cpy>=0.3]-0.3)
+            # curr_total_heat_cnt[i] = heat[heat>0.5].shape[0]
+            # curr_total_heat[i] = np.sum(heat[height>0.2])
 
-            curr_total_heat_cnt[i] = heat[heat>0.5].shape[0]
-            curr_total_heat[i] = np.sum(heat[height>0.2])
-
-            prevParts = np.concatenate([prev_part_state[i,:,0,np.newaxis],prev_part_heights[i,:,np.newaxis],prev_part_state[i,:,1,np.newaxis]],axis=1)
             currParts = np.concatenate([curr_part_state[i,:,0,np.newaxis],curr_part_heights[i,:,np.newaxis],curr_part_state[i,:,1,np.newaxis]],axis=1)
-
-            ang_vel = self.get_angular_vel(prevParts,currParts)
+            curr_part_vel = curr_part_vels[i]
+            ang_vel = self.get_angular_vel(currParts,curr_part_vel)
             ang_vels_full[i] = ang_vel
             ang_vel_proj = np.dot(ang_vel,np.array([0,0,1]))**2
             ang_vels[i] = ang_vel_proj
@@ -162,14 +141,6 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
 
-        if(self.currCurriculum==0):
-            # # rewards =height_diff+ 5*total_heat
-            rewards = 0.1*height_diff#+5*(curr_total_heat-prev_total_heat)
-        else:
-            rewards = np.clip(curr_total_heat_cnt-prev_total_heat_cnt,0,np.max(curr_total_heat_cnt-prev_total_heat_cnt))#+5*np.clip((curr_total_heat-prev_total_heat),0,2)
-        
-        # print(curr_total_heat_cnt)
-        # rewards =  0.1*height_diff+np.clip(curr_total_heat_cnt-prev_total_heat_cnt,0,np.max(curr_total_heat_cnt-prev_total_heat_cnt))+ang_vels
         rewards =  0.1*height_diff+3*ang_vels
 
         self.rolloutRet += rewards
@@ -186,7 +157,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
     def _get_obs(self):
 
-        bar_states, part_states, part_heights,part_temps = self.get_state()
+        bar_states, part_states, part_heights,part_vels = self.get_state()
         obs_list = []
 
         for i in range(self.numInstances):
@@ -197,8 +168,8 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             part_state = part_state[valid_idx]
             part_height = part_heights[i]
             part_height = part_height[valid_idx]
-            part_temp = part_temps[i]
-            part_temp = part_temp[valid_idx]
+            part_vel = part_vels[i]
+            part_vel = part_vel[valid_idx]
             bar_state = bar_states[i]
 
             bar_y_rot_vec = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])
@@ -213,18 +184,6 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
                 part_state, bar_state, bar_rot, normalized=True)
 
             height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height-bar_state[0, 1])
-
-            # temp_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_temp)
-
-            # temp_map_lower = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])<0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])<0.2])
-            # temp_map_higher = self.get_mean_height_map(part_state[(part_height-bar_state[0,1])>0.2], bar_state, bar_rot, part_temp[(part_height-bar_state[0,1])>0.2])
-
-            # temp_map = 0.3*temp_map_higher+0.7*temp_map_lower
-            # if(i==0):
-            #     import matplotlib.pyplot as plt
-            #     plt.figure()
-            #     plt.imshow(height_map)
-            #     plt.show()
 
             bar_pos = bar_state[0]  # 3
             bar_ang_x = np.array([np.cos(bar_state[1, 0]), np.sin(bar_state[1, 0])])  # 2
@@ -259,8 +218,8 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             H = np.clip(H, 0, 1)
         return H
 
-    def get_angular_vel(self,prev_particles,curr_particles):
-        return self.get_angular_vel_flex(prev_particles,curr_particles)
+    def get_angular_vel(self,part_pos,part_vel):
+        return self.get_angular_vel_flex(part_pos,part_vel)
     def get_mean_height_map(self, particles, bar_state, rot, heights, normalized=True, width=2.5):
 
         if (particles.shape[0] == 0):
@@ -270,7 +229,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         particles = np.matmul(particles, rot.transpose())
 
         particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
-        # H = self.get_density(particles, self.resolution,
+        # H = self.get_densiaaaaaaty(particles, self.resolution,
         #                      2.5, self.mapHalfExtent)
         H = self.get_height_map(particles, heights, self.resolution, width, self.mapHalfExtent)
         # print(np.max(H))
@@ -287,13 +246,13 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         numPart =  (full_state.shape[1]-4)//2  
         part_state = full_state[:, 4:4+numPart, (0, 2)]
         
-        part_temp = full_state[:, 4+numPart:4+2*numPart, 0]
+        part_vel = full_state[:, 4+numPart:4+2*numPart, :]
 
         bar_state = full_state[:, :4, :]
 
         part_heights = full_state[:, 4:4+numPart, 1]
 
-        return bar_state, part_state, part_heights, part_temp
+        return bar_state, part_state, part_heights, part_vel
 
     def _reset(self):
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
