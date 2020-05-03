@@ -42,7 +42,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -63,8 +63,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
         self.innerRatio = 0.8
-        # self.minHeight =0.18
-        self.minHeight =0.1
+        self.minHeight =0.2
+        # self.minHeight =0.1
 
         print("With Height Map Attraction. X Y Axis of Rotation")
 
@@ -102,9 +102,9 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
             transformed_action[i, 0:3] = action[i, 0:3] + prev_bar_state[i, 0]
             transformed_xz_velocity = bar_rot @ prev_bar_state[i,2,(0,2)]
-            
+
             # Constraining the rotation to be velocity aligned
-            target_x_rot = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/3,0) if transformed_xz_velocity[1]<0 else np.clip(prev_bar_state[i, 1, 0] + action[i, 3],0,np.pi/3)
+            target_x_rot = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/8,0) if transformed_xz_velocity[1]<0 else np.clip(prev_bar_state[i, 1, 0] + action[i, 3],0,np.pi/8)
             # target_x_rot = -np.pi/3 if transformed_xz_velocity[1]<0 else np.pi/3
 
         flex_action = np.zeros((self.numInstances, 7))
@@ -120,7 +120,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         prev_height_sum = (np.mean(prev_part_heights, axis=1))
 
         prev_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
-      
+
         for i in range(self.numInstances):
             part_state = prev_part_state[i]
             part_height = prev_part_heights[i]
@@ -201,7 +201,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # part_movement_rwd = np.mean(np.linalg.norm(
         #     (curr_part_state - prev_part_state), axis=2), axis=1)
 
-            
+
         curr_height_sum = (np.mean(curr_part_heights, axis=1))
 
         # print(1-np.exp(-40*part_movement_rwd))
@@ -221,7 +221,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # print(1 - curr_height_sum)
         # height_min_rwd = 0.1*(curr_height_cnt-prev_height_cnt)+10*(prev_height_sum-curr_height_sum)
         height_min_rwd = 50*(prev_height_sum - curr_height_sum)
-        
+
         bar_vert_rwd = abs(prev_bar_state[:,0,1]-curr_bar_state[:,0,1])
         # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
         rewards = 0.1*bar_vert_rwd+0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.001*curr_outlier_dist #+ height_min_rwd
@@ -249,14 +249,14 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             stage = self.stage[i]
             part_state = part_states[i]
             part_height = part_heights[i]
-            
+
             part_height = part_height[
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
             part_state = part_state[
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
-            
+
             bar_state = bar_states[i]
 
             bar_y_rot_vec = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])
@@ -301,15 +301,15 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
     def get_particle_density(self, particles, bar_state, rot, normalized=True, width=2.5):
         if (particles.shape[0] == 0):
             return np.zeros((self.resolution, self.resolution))
-        
-        
+
+
         particles -= bar_state[0, (0, 2)]
 
         particles = np.matmul(particles, rot.transpose())
 
         particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
 
-        
+
         H = self.get_density(particles, self.resolution,
                              width, self.mapHalfExtent)
 
