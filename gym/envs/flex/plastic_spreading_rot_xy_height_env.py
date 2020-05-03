@@ -42,7 +42,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -112,7 +112,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
-        flex_action[:, 3] = target_x_rot
+        flex_action[:, 3] = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/8,np.pi/8)
         flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 4]
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0

@@ -39,13 +39,15 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
         action_bound = np.array([[-5,-5, -5, -np.pi / 2], [
            5, 5,5, np.pi / 2]])
+        # action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
+        #    8, 8,8, np.pi / 2]])
         # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
         #     7, 7, np.pi / 2,-1]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=0, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -56,12 +58,12 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
         # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
-        # self.center_list = np.random.uniform(-3, 3, (100, 2))
+        self.center_list = np.random.uniform(-3, 3, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -76,7 +78,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =0
+        self.currCurriculum =3
         print("Plastic Goal Sweeping With Lifting Dof")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -136,7 +138,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = np.clip(transformed_action[:, 1],0,1)
+        flex_action[:, 1] = 0#np.clip(transformed_action[:, 1],0,1)
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = 0
@@ -360,7 +362,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         # pos[:,0] = 4
         # pos[:,2] = 4
 
-        pos[:,1] =np.random.uniform(0, 1, (self.numInstances))
+        pos[:,1] =0*np.random.uniform(0, 1, (self.numInstances))
 
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 3))
         rot[:, 2] = 0  # Do not control the z axis rotation

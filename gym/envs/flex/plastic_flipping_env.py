@@ -32,14 +32,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([7,2,7])
+        self.clusterDim = np.array([6,2,6])
         action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
             10, 10, 10, np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -134,15 +134,17 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             curr_part_vel = curr_part_vels[i]
             ang_vel = self.get_angular_vel(currParts,curr_part_vel)
             ang_vels_full[i] = ang_vel
-            ang_vel_proj = np.dot(ang_vel,np.array([0,0,1]))**2
-            ang_vels[i] = ang_vel_proj
+            ang_vel_proj = np.dot(ang_vel,np.array([0,0,1]))
+            ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([0,0,1]))
+            ang_vels[i] = 0.05*ang_vel_proj#-ang_vel_res
 
         self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
 
-        rewards =  0.1*height_diff+3*ang_vels
-
+        rewards =  0.1*height_diff#+ang_vels
+        # print(height_diff)
+        # print(ang_vels)
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
@@ -185,6 +187,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height-bar_state[0, 1])
 
+            ang_vel = self.get_angular_vel(part_state,part_vel) #3
             bar_pos = bar_state[0]  # 3
             bar_ang_x = np.array([np.cos(bar_state[1, 0]), np.sin(bar_state[1, 0])])  # 2
 
@@ -407,13 +410,13 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         lr.fill([200, 200, 200])
 
         height_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
-        heat_map = obs[0, self.direct_info_dim+ self.resolution * self.resolution:self.direct_info_dim + self.resolution * self.resolution*2]
+        # heat_map = obs[0, self.direct_info_dim+ self.resolution * self.resolution:self.direct_info_dim + self.resolution * self.resolution*2]
 
         height_map = np.reshape(
             height_map, (self.resolution, self.resolution)).astype(np.float64)
 
-        heat_map = np.reshape(
-            heat_map, (self.resolution, self.resolution)).astype(np.float64)
+        # heat_map = np.reshape(
+        #     heat_map, (self.resolution, self.resolution)).astype(np.float64)
 
 
         # self.draw_grid(tl, bar_map, 0, 1)
@@ -422,7 +425,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         # self.live_pc(ll,self.curr_pc)
         self.draw_grid(ll, height_map, 0, 1)
 
-        self.draw_grid(lr, heat_map, 0, 1)
+        # self.draw_grid(lr, heat_map, 0, 1)
         #
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() /
