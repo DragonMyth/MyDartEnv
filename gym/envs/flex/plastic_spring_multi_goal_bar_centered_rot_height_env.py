@@ -76,7 +76,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =3
+        self.currCurriculum =0
         print("Plastic Goal Sweeping With Lifting Dof")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)

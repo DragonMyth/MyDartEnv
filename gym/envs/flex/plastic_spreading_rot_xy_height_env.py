@@ -63,7 +63,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
         self.innerRatio = 0.8
-        self.minHeight =0.2
+        self.minHeight =0.3
         # self.minHeight =0.1
 
         print("With Height Map Attraction. X Y Axis of Rotation")
@@ -105,14 +105,14 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
             # Constraining the rotation to be velocity aligned
             # target_x_rot = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/8,0) if transformed_xz_velocity[1]<0 else np.clip(prev_bar_state[i, 1, 0] + action[i, 3],0,np.pi/8)
-            target_x_rot = -np.pi/6 if transformed_xz_velocity[1]<0 else np.pi/6
+            target_x_rot = -np.pi/6 if action[i,2]<0 else np.pi/6
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
         flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
-        flex_action[:, 3] = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/8,np.pi/8)
+        flex_action[:, 3] = target_x_rot
         flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 4]
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
