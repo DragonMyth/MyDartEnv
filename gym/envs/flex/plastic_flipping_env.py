@@ -24,7 +24,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         self.direct_info_dim = 10
         obs_size = self.resolution * self.resolution *1 + self.direct_info_dim
 
-        self.frame_skip = 10
+        self.frame_skip = 3
         self.mapHalfExtent = 4
         self.mapPartitionSize = 3
         self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
@@ -134,17 +134,16 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             curr_part_vel = curr_part_vels[i]
             ang_vel = self.get_angular_vel(currParts,curr_part_vel)
             ang_vels_full[i] = ang_vel
-            ang_vel_proj = np.dot(ang_vel,np.array([0,0,1]))
+            ang_vel_proj = np.dot(ang_vel,np.array([1,0,0]))
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([0,0,1]))
-            ang_vels[i] = 0.05*ang_vel_proj#-ang_vel_res
+            ang_vels[i] = ang_vel_proj#-ang_vel_res
 
         self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
 
-        rewards =  0.1*height_diff#+ang_vels
-        # print(height_diff)
-        # print(ang_vels)
+        rewards =  0.1*height_diff+ang_vels
+
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],

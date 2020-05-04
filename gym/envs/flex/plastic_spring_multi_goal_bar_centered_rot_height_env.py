@@ -37,10 +37,8 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.clusterDim = np.array([5, 2, 5])
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-5,-5, -5, -np.pi / 2], [
-           5, 5,5, np.pi / 2]])
-        # action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
-        #    8, 8,8, np.pi / 2]])
+        action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
+           8, 8,8, np.pi / 2]])
         # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
         #     7, 7, np.pi / 2,-1]])
 
@@ -163,7 +161,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
 
         part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1) * 5
+            (curr_part_state - prev_part_state), axis=2), axis=1)*5
 
 
         target_dist_curr = np.zeros(self.numInstances)
@@ -193,7 +191,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         #         self.stage[i] = 0
         #         # print(-0.1*np.exp(0.001*(dist-1)))
         #         target_dist_curr[i] = -0.1*np.exp(0.001*(dist-1))
-            
+
         obs = self._get_obs()
 
         rewards =target_dist_curr
@@ -220,7 +218,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             part_state = part_state[
                 (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
                         part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
-            
+
 
             bar_state = bar_states[i]
 
@@ -306,10 +304,10 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         if(np.mean(self.rolloutRet) > 400):
             self.currCurriculum=min(3,self.currCurriculum+1)
 
-        print("Current Curriculum Level: ", self.currCurriculum)     
-        print("Current Cluster Number Level: ", self.numInitClusters)         
-        print("Return at current rollout: ", self.rolloutRet)            
-        print("Mean Return at current rollout: ", np.mean(self.rolloutRet))            
+        print("Current Curriculum Level: ", self.currCurriculum)
+        print("Current Cluster Number Level: ", self.numInitClusters)
+        print("Return at current rollout: ", self.rolloutRet)
+        print("Mean Return at current rollout: ", np.mean(self.rolloutRet))
 
         # self.randGoalRange = 2+2*min(3,self.currCurriculum)
         self.numInitClusters = 1+self.currCurriculum
@@ -338,7 +336,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
                     self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
 
                 self.setInitClusterParam(self.initClusterparam)
-        
+
         flex_env.FlexEnv._reset(self)
         # Post-flex reset calculation
         self.global_rot = self.generate_rand_rot_vec()
@@ -387,19 +385,19 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.set_controller(controllers)
         self.rolloutCnt += 1
 
-        
+
 
         return self._get_obs()
 
     def _render(self, mode='human', close=False):
-        if(self.viewerId==2 or self.viewerId==3): 
+        if(self.viewerId==2 or self.viewerId==3):
             if(self.viewerId==2 and not self.screen):
                 pg.init()
                 self.screen = pg.display.set_mode(self.screen_size, DOUBLEBUF | OPENGL)
             elif(self.viewerId==3 and not self.screen):
                 pg.init()
                 self.screen = pg.display.set_mode(self.screen_size)
-            
+
             width = self.screen_size[0]
             height = self.screen_size[1]
             gap = self.sub_screen_gap
@@ -464,28 +462,28 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         tr = surfaces[1]
         ll = surfaces[2]
         lr = surfaces[3]
-    
+
         tl.fill([200, 200, 200])
         tr.fill([200, 200, 200])
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
-    
+
         part_map = obs[0, self.bar_info:self.bar_info + self.resolution * self.resolution]
         goal_map = obs[0, self.bar_info + self.resolution * self.resolution:self.bar_info +
                        2 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
-    
+
         # bar_map = np.reshape(
         #     bar_map, (self.resolution, self.resolution)).astype(np.float64)
         goal_map = np.reshape(
             goal_map, (self.resolution, self.resolution)).astype(np.float64)
         part_map = np.reshape(
             part_map, (self.resolution, self.resolution)).astype(np.float64)
-    
+
         # self.draw_grid(tl, bar_map, 0, 1)
         self.draw_grid(tr, goal_map, 0, 1)
-    
+
         self.draw_grid(lr, part_map, 0, 1)
         #
         self.screen.blit(tl, (0, 0))
@@ -493,7 +491,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
                               2 + self.sub_screen_gap / 2, 0))
         self.screen.blit(ll, (0, self.screen.get_height() /
                               2 + self.sub_screen_gap / 2))
-    
+
         self.screen.blit(lr, (
             self.screen.get_width() / 2 + self.sub_screen_gap / 2,
             self.screen.get_height() / 2 + self.sub_screen_gap / 2))
@@ -502,13 +500,13 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         data = (data - min) / scale
         w_gap = surface.get_width() / data.shape[0]
         h_gap = surface.get_height() / data.shape[1]
-    
+
         for y in range(data.shape[0]):
             for x in range(data.shape[1]):
                 color = np.array([1.0, 1.0, 1.0])
                 color *= data[y, x]
                 color = np.clip(color, 0, 1)
-    
+
                 final_color = 255 * \
                     (np.array([1, 0, 0]) * color +
                      np.array([0, 0, 1]) * (1 - color))
