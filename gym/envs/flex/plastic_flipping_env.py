@@ -24,7 +24,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         self.direct_info_dim = 10
         obs_size = self.resolution * self.resolution *1 + self.direct_info_dim
 
-        self.frame_skip = 3
+        self.frame_skip = 10
         self.mapHalfExtent = 4
         self.mapPartitionSize = 3
         self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
@@ -39,7 +39,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -108,13 +108,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
 
         prev_height_diff = np.min(prev_part_heights,axis=1)-prev_bar_state[:,0,1]
-
+        prev_com_xz = np.mean(prev_part_state,axis=1)
       
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
 
         curr_bar_state, curr_part_state, curr_part_heights,curr_part_vels = self.get_state()
-
+        
+        curr_com_xz = np.mean(curr_part_state,axis=1) 
         obs = self._get_obs()
 
         height_diff = np.min(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
@@ -136,17 +137,24 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             ang_vels_full[i] = ang_vel
             ang_vel_proj = np.dot(ang_vel,np.array([1,0,0]))
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([0,0,1]))
-            ang_vels[i] = ang_vel_proj#-ang_vel_res
+            ang_vels[i] = 0.1*ang_vel_proj#-ang_vel_res
 
         self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
 
-        rewards =  0.1*height_diff+ang_vels
+
+        com_diff = 2*np.linalg.norm(curr_com_xz-prev_com_xz,axis=1)
+        # print(com_diff)
+        rewards =  0.1*height_diff+ang_vels#-com_diff
 
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
+            'Height' : 0.1*height_diff[0],
+            'ang_vel': ang_vels[0],
+            'com_diff': com_diff[0]
+
 
         }
         reward_decomp = [0,0,0]
