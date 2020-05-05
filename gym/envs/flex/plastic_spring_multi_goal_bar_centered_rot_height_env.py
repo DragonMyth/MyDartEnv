@@ -45,7 +45,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -174,7 +174,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
             if(dist<1):
                 self.stage[i] = 1
-                target_dist_curr[i] = 0.3+20*(prev_distances_center_1[i]-curr_distances_center_1[i]) + part_movement_rwd[i]
+                target_dist_curr[i] = 0.3+5*(prev_distances_center_1[i]-curr_distances_center_1[i]) + part_movement_rwd[i]
             else:
                 self.stage[i] = 0
                 target_dist_curr[i] = -0.1*dist
