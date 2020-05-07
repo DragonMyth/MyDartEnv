@@ -9,6 +9,7 @@ import itertools
 from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from scipy.spatial.transform import Rotation as R
 
 try:
     import bindings as pyFlex
@@ -45,7 +46,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -118,21 +119,10 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
         transformed_action = np.zeros((self.numInstances, 5))
         for i in range(action.shape[0]):
-            bar_rot_trans = prev_bar_state[i, 1, 1]
-            bar_rot_vec = np.array([np.cos(bar_rot_trans), np.sin(bar_rot_trans)])
+            bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
+            action_trans = bar_rot.apply(action[i, 0:3])
 
-            bar_rot = np.zeros((2, 2))
-            bar_rot[0, 0] = bar_rot_vec[0]
-            bar_rot[0, 1] = -bar_rot_vec[1]
-            bar_rot[1, 0] = bar_rot_vec[1]
-            bar_rot[1, 1] = bar_rot_vec[0]
-
-            targ_pos_trans = np.matmul(
-                bar_rot.transpose(), action[i, (0, 2)])
-
-            action[i, (0, 2)] = targ_pos_trans
-
-            transformed_action[i, 0:3] = action[i, 0:3] + prev_bar_state[i, 0]
+            transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]

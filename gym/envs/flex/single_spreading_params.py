@@ -10,7 +10,6 @@ from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from scipy.spatial.distance import cdist
-from scipy.spatial.transform import Rotation as R
 
 try:
     import bindings as pyFlex
@@ -18,29 +17,35 @@ except ImportError as e:
     raise error.DependencyNotInstalled(
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
-class PlasticFlippingEnv(flex_env.FlexEnv):
+class PlasticTestEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        self.direct_info_dim = 10
-        obs_size = self.resolution * self.resolution *1 + self.direct_info_dim
+        self.direct_info_dim = 14
+        obs_size = self.resolution * self.resolution * 2 + self.direct_info_dim
 
         self.frame_skip = 10
         self.mapHalfExtent = 4
         self.mapPartitionSize = 3
+
         self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
             self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([6,2,6])
-        action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
-            10, 10, 10, np.pi / 2]])
+        self.clusterDim = np.array([10,10,10])
+        # self.clusterDim = np.array([6,5,6])
+
+        action_bound = np.array([[-8, -8, -8, -np.pi / 2,-np.pi / 2], [
+            8, 8, 8, np.pi / 2,np.pi / 2]])
+
+        # action_bound = np.array([[-5, -5, -5, -np.pi / 2,-np.pi / 2], [
+        #     5, 5, 5, np.pi / 2,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -48,7 +53,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         }
 
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([1.5, 2.0, 0.8])
+        self.barDim = np.array([0.7, 1, 0.001])
 
         # self.goal_gradients = np.zeros((self.numInstances,self.resolution,self.resolution))
 
@@ -60,8 +65,11 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
+        self.innerRatio = 0.8
+        # self.minHeight =0.3
+        self.minHeight =0.15
 
-        print("============================================Flipping================================================")
+        print("With Height Map Attraction. X Y Axis of Rotation")
 
     def angle_to_rot_matrix(self, angles):
         rot_vec = np.ones((self.numInstances, 2, 2))
@@ -74,133 +82,232 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
     def _step(self, action):
         action = action * self.action_scale
-        prev_bar_state, prev_part_state, prev_part_heights,prev_part_vel = self.get_state()
+        prev_bar_state, prev_part_state, prev_part_heights = self.get_state()
 
         rot_mat = self.angle_to_rot_matrix(action[:, 3])
 
         transformed_action = np.zeros((self.numInstances, 6))
 
         for i in range(action.shape[0]):
+            bar_rot_trans = prev_bar_state[i, 1, 1]
+            bar_rot_vec = np.array([np.cos(bar_rot_trans), np.sin(bar_rot_trans)])
 
-            bar_rot = R.from_euler('x',prev_bar_state[i,1,0])
+            bar_rot = np.zeros((2, 2))
+            bar_rot[0, 0] = bar_rot_vec[0]
+            bar_rot[0, 1] = -bar_rot_vec[1]
+            bar_rot[1, 0] = bar_rot_vec[1]
+            bar_rot[1, 1] = bar_rot_vec[0]
 
-            action_trans = bar_rot.apply(action[i,0:3])
-            transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
+            targ_pos_trans = np.matmul(
+                bar_rot.transpose(), action[i, (0, 2)])
 
+            action[i, (0, 2)] = targ_pos_trans
+
+            transformed_action[i, 0:3] = action[i, 0:3] + prev_bar_state[i, 0]
+            transformed_xz_velocity = bar_rot @ prev_bar_state[i,2,(0,2)]
+
+            # Constraining the rotation to be velocity aligned
+            # target_x_rot = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/8,0) if transformed_xz_velocity[1]<0 else np.clip(prev_bar_state[i, 1, 0] + action[i, 3],0,np.pi/8)
+            if(np.pi/2>prev_bar_state[i,1,1]>-np.pi/2):
+                target_x_rot = 0 
+                if (action[i,2])<-0.1:
+
+                    target_x_rot = -np.pi/6
+                elif action[i,2]>0.1:
+                    target_x_rot = np.pi/6 
+            else:
+                target_x_rot = 0 
+                if (action[i,2])<-0.1:
+
+                    target_x_rot = np.pi/6
+                elif action[i,2]>0.1:
+                    target_x_rot = -np.pi/6  
+                           
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = transformed_action[:, 1]
+        flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
         flex_action[:, 2] = transformed_action[:, 2]
 
-        flex_action[:, 3] = prev_bar_state[:, 1, 0] + action[:, 3]
-        flex_action[:, 4] = 0
+        flex_action[:, 3] = target_x_rot
+        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 4]
         flex_action[:, 5] = 0
         flex_action[:, 6] = 0
 
+        prev_height_sum = (np.mean(prev_part_heights, axis=1))
 
-        prev_height_diff = np.min(prev_part_heights,axis=1)-prev_bar_state[:,0,1]
-        prev_com_xz = np.mean(prev_part_state,axis=1)
-      
+        prev_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
+
+        for i in range(self.numInstances):
+            part_state = prev_part_state[i]
+            part_height = prev_part_heights[i]
+
+            filtered_parts = part_state[
+                (part_state[:, 0] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 0] < self.innerRatio*self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 1] < self.innerRatio*self.mapHalfExtent) & (part_height<0.2)]
+            filtered_heights = part_height[(part_state[:, 0] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 0] < self.innerRatio*self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 1] < self.innerRatio*self.mapHalfExtent) & (part_height<0.2)]
+
+            height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
+                                              filtered_heights,width=1.5)
+
+            prev_untransformed_height[i] = height.flatten()
+
+        prev_height_cnt = np.sum((prev_untransformed_height>0).astype(int),axis=1)
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
 
-        curr_bar_state, curr_part_state, curr_part_heights,curr_part_vels = self.get_state()
-        
-        curr_com_xz = np.mean(curr_part_state,axis=1) 
+        curr_bar_state, curr_part_state, curr_part_heights = self.get_state()
+
         obs = self._get_obs()
 
-        height_diff = np.min(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
+        curr_untransformed_height = np.zeros((self.numInstances, self.resolution * self.resolution))
 
+        part_movement_rwd = np.zeros((self.numInstances))
 
-        curr_total_heat = np.zeros(self.numInstances)
-        curr_total_heat_cnt = np.zeros(self.numInstances)
-        ang_vels = np.zeros(self.numInstances)
-        ang_vels_full = np.zeros((self.numInstances,3))
+        curr_outlier_dist = np.zeros((self.numInstances))
         for i in range(self.numInstances):
-            height = height_diff[i]
+            part_state = curr_part_state[i]
+            part_height = curr_part_heights[i]
+            part_state_p = prev_part_state[i]
+            part_height_p = prev_part_heights[i]
 
-            # curr_total_heat_cnt[i] = heat[heat>0.5].shape[0]
-            # curr_total_heat[i] = np.sum(heat[height>0.2])
+            filtered_parts = part_state[
+                (part_state[:, 0] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 0] < self.innerRatio*self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 1] < self.innerRatio*self.mapHalfExtent) & (part_height<0.2)]
+            filtered_heights = part_height[(part_state[:, 0] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 0] < self.innerRatio*self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.innerRatio*self.mapHalfExtent) & (part_state[:, 1] < self.innerRatio*self.mapHalfExtent) & (part_height<0.2)]
 
-            currParts = np.concatenate([curr_part_state[i,:,0,np.newaxis],curr_part_heights[i,:,np.newaxis],curr_part_state[i,:,1,np.newaxis]],axis=1)
-            curr_part_vel = curr_part_vels[i]
-            ang_vel = self.get_angular_vel(currParts,curr_part_vel)
-            if i ==0:
-                print(curr_part_vel)
-            ang_vels_full[i] = 5*ang_vel
-            ang_vel_proj = np.dot(ang_vel,np.array([1,0,0]))
-            ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([0,0,1]))
-            ang_vels[i] = 0.1*ang_vel_proj#-ang_vel_res
+            height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
+                                              filtered_heights,width=1.5)
 
-        self.set_aux_info(ang_vels_full)
-        height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
-        height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
+            outliers = part_state[
+                (part_state[:, 0] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 0] > self.innerRatio*self.mapHalfExtent) | (
+                        part_state[:, 1] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 1] > self.innerRatio*self.mapHalfExtent)]
+            curr_untransformed_height[i] = height.flatten()
+
+            part_movement = np.linalg.norm(part_state_p-part_state,axis=1)
+            part_movement[part_height_p<0.2] *=-50
+            part_movement_rwd[i] = np.mean(part_movement,axis=0)
+
+            if(outliers.shape[0]>0):
+                curr_outlier_dist[i] = np.sum(np.linalg.norm(np.abs(outliers)-self.innerRatio*self.mapHalfExtent,axis=1))
+        # curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
+
+        curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
 
 
-        com_diff = 2*np.linalg.norm(curr_com_xz-prev_com_xz,axis=1)
-        # print(com_diff)
-        rewards =  0.1*height_diff+ang_vels#-com_diff
+        heighest_part_idx = np.argmax(curr_part_heights, axis=1)
+        heighest_part_pos = np.take_along_axis(curr_part_state,heighest_part_idx[:,np.newaxis,np.newaxis],axis=1)
+        heighest_part_pos = np.squeeze(heighest_part_pos,axis=1)
 
+        heighest_height = np.take_along_axis(curr_part_heights,heighest_part_idx[:,np.newaxis],axis=1)
+        heighest_height = np.squeeze(heighest_height,axis=1)
+        # heighest_part_pos = np.concatenate(heighest_part_pos[:,0],heighest_height[:,0],heighest_part_pos[:,1])
+        # maxI = (maxFlatIdx / self.resolution).astype(int)
+        # maxJ = maxFlatIdx - self.resolution * maxI
+
+        # posX = np.expand_dims((maxJ + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
+        # posY = np.expand_dims((maxI + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
+
+        # densePos = np.concatenate([posX, posY], axis=1)
+        # # transformed_densePos = np.matmul()
+        # to_bar_dist_curr = (np.linalg.norm(heighest_part_pos - curr_bar_state[:, 0, (0, 2)], axis=1)) ** 2
+        # to_bar_height_dist_curr = curr_bar_state[:, 0, 1]-heighest_height
+
+        # part_movement_rwd = np.mean(np.linalg.norm(
+        #     (curr_part_state - prev_part_state), axis=2), axis=1)
+
+
+        curr_height_sum = (np.mean(curr_part_heights, axis=1))
+
+        # print(1-np.exp(-40*part_movement_rwd))
+        target_dist_curr = np.zeros(self.numInstances)
+
+        # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
+        # for i in range(self.numInstances):
+        #     dist= to_bar_dist_curr[i]
+        #     height_dist = to_bar_height_dist_curr[i]
+
+        #     if(dist<=1 and -0.5<height_dist):
+        #         self.stage[i]  =  0
+        #         target_dist_curr[i] = 0.1*(curr_height_cnt[i]-prev_height_cnt[i])+10*(prev_height_sum[i]-curr_height_sum[i])
+        #     else:
+        #         self.stage[i]  =  1
+        #         target_dist_curr[i] = -0.1*dist+0.03*height_dist
+        # print(1 - curr_height_sum)
+        # height_min_rwd = 0.1*(curr_height_cnt-prev_height_cnt)+10*(prev_height_sum-curr_height_sum)
+        height_min_rwd = 50*(prev_height_sum - curr_height_sum)
+
+        bar_vert_rwd = abs(prev_bar_state[:,0,1]-curr_bar_state[:,0,1])
+        # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
+        rewards = 0.1*bar_vert_rwd+0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.001*curr_outlier_dist #+ height_min_rwd
+        # print(0.001*curr_outlier_dist)
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
-            'Height' : 0.1*height_diff[0],
-            'ang_vel': ang_vels[0],
-            'com_diff': com_diff[0]
-
-
         }
-        reward_decomp = [0,0,0]
+
+        reward_decomp = [rewards[0], 0,0]
+
         if (len(self.rwdBuffer) >= 100):
             self.rwdBuffer.pop(0)
+
         self.rwdBuffer.append(reward_decomp)
 
         return obs, rewards, done, info
 
     def _get_obs(self):
 
-        bar_states, part_states, part_heights,part_vels = self.get_state()
+        bar_states, part_states, part_heights = self.get_state()
         obs_list = []
 
         for i in range(self.numInstances):
             stage = self.stage[i]
             part_state = part_states[i]
-            valid_idx = (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
-                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)
-            part_state = part_state[valid_idx]
             part_height = part_heights[i]
-            part_height = part_height[valid_idx]
-            part_vel = part_vels[i]
-            part_vel = part_vel[valid_idx]
+
+            part_height = part_height[
+                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+            part_state = part_state[
+                (part_state[:, 0] > -self.mapHalfExtent) & (part_state[:, 0] < self.mapHalfExtent) & (
+                        part_state[:, 1] > -self.mapHalfExtent) & (part_state[:, 1] < self.mapHalfExtent)]
+
             bar_state = bar_states[i]
 
             bar_y_rot_vec = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])
 
-            # bar_rot = np.zeros((2, 2))
-            # bar_rot[0, 0] = bar_y_rot_vec[0]
-            # bar_rot[0, 1] = -bar_y_rot_vec[1]
-            # bar_rot[1, 0] = bar_y_rot_vec[1]
-            # bar_rot[1, 1] = bar_y_rot_vec[0]
+            bar_rot = np.zeros((2, 2))
+            bar_rot[0, 0] = bar_y_rot_vec[0]
+            bar_rot[0, 1] = -bar_y_rot_vec[1]
+            bar_rot[1, 0] = bar_y_rot_vec[1]
+            bar_rot[1, 1] = bar_y_rot_vec[0]
 
-            # density = self.get_particle_density(
-            #     part_state, bar_state, bar_rot, normalized=True)
+            height_map = self.get_mean_height_map(part_state.copy(), bar_state, bar_rot, part_height.copy())
 
-            # height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height)
+            density = self.get_particle_density(
+                part_state.copy(), bar_state, bar_rot, normalized=True)
+            # if(i==0):
+            #     import matplotlib.pyplot as plt
+            #     plt.figure()
+            #     plt.imshow(height_map)
+            #     plt.show()
 
-            part_pos_xyz = np.concatenate([part_state[:,0,np.newaxis],part_height[:,np.newaxis],part_state[:,1,np.newaxis]],axis=1)
-
-            height_map = self.get_mean_height_map(part_pos_xyz, bar_state)
-
-            ang_vel = self.get_angular_vel(part_pos_xyz,part_vel) #3
             bar_pos = bar_state[0]  # 3
             bar_ang_x = np.array([np.cos(bar_state[1, 0]), np.sin(bar_state[1, 0])])  # 2
 
-            bar_vel = bar_state[2]  # 3
-            bar_ang_vel_x = np.array([np.cos(bar_state[3, 0]), np.sin(bar_state[3, 0])])  # 2
+            bar_ang_y = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])  # 2
 
-            bar_info = np.concatenate([bar_pos, bar_ang_x, bar_vel, bar_ang_vel_x])
+            bar_vel = bar_state[2]  # 3
+            bar_ang_vel_x = np.array([np.cos(bar_state[3, 0]),np.sin(bar_state[3,0])])  # 2
+            bar_ang_vel_y = np.array([np.cos(bar_state[3, 1]),np.sin(bar_state[3,1])])  # 2
+
+            bar_info = np.concatenate([bar_pos, bar_ang_x,bar_ang_y, bar_vel, bar_ang_vel_x,bar_ang_vel_y])
+
+            # height_map[height_map>0] = bar_pos[1]-height_map[height_map>0]
+
             obs = np.concatenate(
-                [bar_info, height_map.flatten()
+                [bar_info, density.flatten(), height_map.flatten()
                  ])
 
             obs_list.append(obs)
@@ -210,39 +317,40 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
     def get_particle_density(self, particles, bar_state, rot, normalized=True, width=2.5):
         if (particles.shape[0] == 0):
             return np.zeros((self.resolution, self.resolution))
+
+
         particles -= bar_state[0, (0, 2)]
 
         particles = np.matmul(particles, rot.transpose())
 
         particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
 
+
         H = self.get_density(particles, self.resolution,
                              width, self.mapHalfExtent)
 
         if normalized:
-            # H = H ** (1.0 / 2)
-            H = H / (200)
-            H = np.clip(H, 0, 1)
+            H = H ** (1.0 / 2)
+            H = H / (50)
+            # H = H / (200)
+            # H = np.clip(H, 0, 1)
         return H
 
-    def get_angular_vel(self,part_pos,part_vel):
-        return self.get_angular_vel_flex(part_pos,part_vel)
-    
-    
-    def get_mean_height_map(self, particles, bar_state, normalized=True, width=2.5):
+    def get_mean_height_map(self, particles, bar_state, rot, heights, normalized=True, width=2.5):
 
         if (particles.shape[0] == 0):
             return np.zeros((self.resolution, self.resolution))
+        particles -= bar_state[0, (0, 2)]
 
-        bar_euler = bar_state[1]
-        bar_rot = R.from_euler('x',bar_euler[0])
+        particles = np.matmul(particles, rot.transpose())
 
-        rel_pos = particles-bar_state[0]
+        particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
 
-        trans_pos = bar_rot.inv().apply(rel_pos)
-        trans_pos[:,(0,2)] = np.clip(trans_pos[:,(0,2)], -self.barDim[1], self.barDim[1])
+        # H = self.get_density(particles, self.resolution,
+        #                      2.5, self.mapHalfExtent)
 
-        H = self.get_height_map(trans_pos[:,(0,2)], trans_pos[:,1], self.resolution, width, self.mapHalfExtent)
+        H = self.get_height_map(particles, heights, self.resolution, width, self.mapHalfExtent)
+
         # print(np.max(H))
         # if normalized:
         # H = H ** (1.0 / 2)
@@ -250,56 +358,27 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         # H = H / (50)
 
         # H = np.clip(H, 0, 1)
-        return H
-    # def get_mean_height_map(self, particles, bar_state, rot, heights, normalized=True, width=2.5):
-
-    #     if (particles.shape[0] == 0):
-    #         return np.zeros((self.resolution, self.resolution))
-    #     particles -= bar_state[0, (0, 2)]
-
-    #     particles = np.matmul(particles, rot.transpose())
-
-    #     particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
-    #     # H = self.get_densiaaaaaaty(particles, self.resolution,
-    #     #                      2.5, self.mapHalfExtent)
-    #     H = self.get_height_map(particles, heights, self.resolution, width, self.mapHalfExtent)
-    #     # print(np.max(H))
-    #     # if normalized:
-    #     # H = H ** (1.0 / 2)
-    #     # H = H / (10)
-    #     # H = H / (50)
-
-    #     # H = np.clip(H, 0, 1)
-    #     return H
+        return (H+1)**2-1
 
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
-        numPart =  (full_state.shape[1]-4)//2  
-        part_state = full_state[:, 4:4+numPart, (0, 2)]
-        
-        part_vel = full_state[:, 4+numPart:4+2*numPart, :]
-
+        part_state = full_state[:, 4::, (0, 2)]
         bar_state = full_state[:, :4, :]
-
-        part_heights = full_state[:, 4:4+numPart, 1]
-
-        return bar_state, part_state, part_heights, part_vel
+        part_heights = full_state[:, 4::, 1]
+        return bar_state, part_state, part_heights
 
     def _reset(self):
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
 
         print("Return at current rollout: ", self.rolloutRet)
         print("Mean Return at current rollout: ", np.mean(self.rolloutRet))
-        print("Current Curriculum: ",self.currCurriculum)
-        if(np.mean(self.rolloutRet)>70):
-            self.currCurriculum = 1
 
         self.rolloutRet = np.zeros(self.numInstances)
         if self.randomCluster:
             self.idxPool = np.array([[0, 0]])
 
             # self.idxPool = np.array([x for x in itertools.product(np.arange(self.mapPartitionSize) - int(
-            #     self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
+            #      self.mapPartitionSize / 2), np.arange(self.mapPartitionSize) - int(self.mapPartitionSize / 2))])
 
             # Pre-flex reset calculation
             self.initClusterparam = np.zeros(
@@ -313,41 +392,40 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
                 for j in range(self.numInitClusters):
                     self.initClusterparam[i, (j * 6, j * 6 + 2)
                     ] = self.idxPool[indices[j]] * 2.5
-                    self.initClusterparam[i,j*6+1] = 6
                     self.initClusterparam[i, j * 6 + 3:j * 6 + 6] = self.clusterDim
 
                 self.setInitClusterParam(self.initClusterparam)
-
 
         flex_env.FlexEnv._reset(self)
 
         # Post-flex reset calculation
         self.setMapHalfExtent(self.mapHalfExtent)
 
-        pos = np.zeros((self.numInstances, 3))
-        # pos[:,0] = 1
-        # pos[:,2] = 1
-        # pos[:,2] = -0.4
-        # pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
+        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
+        # pos[:,(0,2)]=4
+        pos[:,1] =np.random.uniform(self.minHeight, 1, (self.numInstances))
+
+        # pos[:,2] = -0.7
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
 
-        rot = np.zeros((self.numInstances, 3))
-        # rot[:,0] = np.pi/2
+        rot = np.random.uniform(-1, 1, (self.numInstances, 3))
+        # rot = np.random.uniform(-0.01, 0.01, (self.numInstances, 3))
 
+        rot[:,0] *= 0.01
+        rot[:,1] *= np.pi/2
         rot[:, 2] = 0  # Do not control the z axis rotation
-
         # pos = np.zeros((self.numInstances, 2))
         # pos[:, 0] = -1.8
         # pos[:, 1] = -1.8
         # rot = np.zeros((self.numInstances,1))
         # rot[:,0] = np.pi/4
 
-        vel = np.zeros((self.numInstances, 3))
-        # vel[:, 1] = 0  # Set vertical velocity to zero
+        vel = np.random.uniform(-0.1,0.1, (self.numInstances, 3))
+        vel[:, 1] = 0  # Set vertical velocity to zero
 
-        angVel = np.zeros((self.numInstances, 3))
+        angVel = np.random.uniform(-0.1, 0.1, (self.numInstances, 3))
 
-        # angVel[:, 2] = 0  # Set angular velocity around z to be 0
+        angVel[:, 2] = 0  # Set angular velocity around z to be 0
         # angVel[:, 0] = 0  # Set angular velocity around x to be 0
 
         barDim = np.tile(self.barDim, (self.numInstances, 1))
@@ -397,11 +475,11 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         ll = surfaces[2]
         lr = surfaces[3]
 
-        part_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
-        goal_map = obs[0, self.direct_info_dim + self.resolution * self.resolution:self.direct_info_dim +
+        part_map = obs[0, 9:9 + self.resolution * self.resolution]
+        goal_map = obs[0, 9 + self.resolution * self.resolution:9 +
                                                                 2 * (self.resolution * self.resolution)]
         particle_goal_map = obs[0,
-                            self.direct_info_dim + 2 * self.resolution * self.resolution:self.direct_info_dim + 3 * (self.resolution * self.resolution)]
+                            9 + 2 * self.resolution * self.resolution:9 + 3 * (self.resolution * self.resolution)]
         # bar_map = obs[0, 8 + 2 * self.resolution *
         #               self.resolution:8 + 3 * (self.resolution * self.resolution)]
 
@@ -439,23 +517,22 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         ll.fill([200, 200, 200])
         lr.fill([200, 200, 200])
 
-        height_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
-        # heat_map = obs[0, self.direct_info_dim+ self.resolution * self.resolution:self.direct_info_dim + self.resolution * self.resolution*2]
+        part_map = obs[0, self.direct_info_dim:self.direct_info_dim + self.resolution * self.resolution]
 
+        part_map = np.reshape(
+            part_map, (self.resolution, self.resolution)).astype(np.float64)
+
+        height_map = obs[0,
+                     self.direct_info_dim + self.resolution * self.resolution:self.direct_info_dim + 2 * self.resolution * self.resolution]
         height_map = np.reshape(
             height_map, (self.resolution, self.resolution)).astype(np.float64)
-
-        # heat_map = np.reshape(
-        #     heat_map, (self.resolution, self.resolution)).astype(np.float64)
-
-
         # self.draw_grid(tl, bar_map, 0, 1)
         self.live_rwd(tl, self.rwdBuffer)
         # self.draw_grid(tr, goal_map, 0, 1)
         # self.live_pc(ll,self.curr_pc)
         self.draw_grid(ll, height_map, 0, 1)
 
-        # self.draw_grid(lr, heat_map, 0, 1)
+        self.draw_grid(lr, part_map, 0, 1)
         #
         self.screen.blit(tl, (0, 0))
         self.screen.blit(tr, (self.screen.get_width() /
@@ -540,35 +617,27 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = PlasticFlippingEnv()
-
+    env = PlasticTestEnv()
+    env.seed(0)
     env.reset()
-    for i in range(20000):
+    for i in range(2000):
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((1, 4))
+        act = np.zeros((49, 5))
         # act[:, 0]=0
-
-        # if(i%100<30):
-        #     act[:, 1] = 1
-
-        #     # act[:, 3] = 1
-
-        # else:
-        #     act[:, 1] = -1
-        #     act[:, 3] = -1
-        # act[:, 2] = 0
-        # act[:, 3] = -1
+        act[:, 1] = 1
+        act[:, 2] = -1
+        act[:, 3] = -1
         # act[:, 4] = 1
 
         # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)
         env.render()
-        # if i % 100 == 0:
-        #     print(i)
-        # if i % 100 == 0:
-        #     env.reset()
+        if i % 100 == 0:
+            print(i)
+        if i % 100 == 0:
+            env.reset()
         if done:
             # env.reset()
             break
