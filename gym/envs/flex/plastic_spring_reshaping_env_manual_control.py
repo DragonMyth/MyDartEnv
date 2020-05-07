@@ -126,8 +126,11 @@ def generate_manual_action_rot_tilt(w, a, s, d, up,down,cw, ccw, cw_t, ccw_t,ski
 
     act = np.zeros((1, 5))
 
-    linear_scale = 0.5
-    ang_scale = 0.3 * np.pi
+    # linear_scale = 0.5
+    # ang_scale = 0.3 * np.pi
+
+    linear_scale = 1
+    ang_scale = 1
     linear_relative_target = np.zeros(3)
 
     target_angle =0# np.arctan2(bar_state[1,1],bar_state[1,0])

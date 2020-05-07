@@ -10,6 +10,7 @@ from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from scipy.spatial.distance import cdist
+from scipy.spatial.transform import Rotation as R
 
 try:
     import bindings as pyFlex
@@ -39,7 +40,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -80,21 +81,11 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         transformed_action = np.zeros((self.numInstances, 6))
 
         for i in range(action.shape[0]):
-            bar_rot_trans = prev_bar_state[i, 1, 1]
-            bar_rot_vec = np.array([np.cos(bar_rot_trans), np.sin(bar_rot_trans)])
 
-            bar_rot = np.zeros((2, 2))
-            bar_rot[0, 0] = bar_rot_vec[0]
-            bar_rot[0, 1] = -bar_rot_vec[1]
-            bar_rot[1, 0] = bar_rot_vec[1]
-            bar_rot[1, 1] = bar_rot_vec[0]
+            bar_rot = R.from_euler('x',prev_bar_state[i,1,0])
 
-            targ_pos_trans = np.matmul(
-                bar_rot.transpose(), action[i, (0, 2)])
-
-            action[i, (0, 2)] = targ_pos_trans
-
-            transformed_action[i, 0:3] = action[i, 0:3] + prev_bar_state[i, 0]
+            action_trans = bar_rot.apply(action[i,0:3])
+            transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
@@ -134,7 +125,9 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             currParts = np.concatenate([curr_part_state[i,:,0,np.newaxis],curr_part_heights[i,:,np.newaxis],curr_part_state[i,:,1,np.newaxis]],axis=1)
             curr_part_vel = curr_part_vels[i]
             ang_vel = self.get_angular_vel(currParts,curr_part_vel)
-            ang_vels_full[i] = ang_vel
+            if i ==0:
+                print(curr_part_vel)
+            ang_vels_full[i] = 5*ang_vel
             ang_vel_proj = np.dot(ang_vel,np.array([1,0,0]))
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([0,0,1]))
             ang_vels[i] = 0.1*ang_vel_proj#-ang_vel_res
@@ -183,18 +176,22 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
             bar_y_rot_vec = np.array([np.cos(bar_state[1, 1]), np.sin(bar_state[1, 1])])
 
-            bar_rot = np.zeros((2, 2))
-            bar_rot[0, 0] = bar_y_rot_vec[0]
-            bar_rot[0, 1] = -bar_y_rot_vec[1]
-            bar_rot[1, 0] = bar_y_rot_vec[1]
-            bar_rot[1, 1] = bar_y_rot_vec[0]
+            # bar_rot = np.zeros((2, 2))
+            # bar_rot[0, 0] = bar_y_rot_vec[0]
+            # bar_rot[0, 1] = -bar_y_rot_vec[1]
+            # bar_rot[1, 0] = bar_y_rot_vec[1]
+            # bar_rot[1, 1] = bar_y_rot_vec[0]
 
-            density = self.get_particle_density(
-                part_state, bar_state, bar_rot, normalized=True)
+            # density = self.get_particle_density(
+            #     part_state, bar_state, bar_rot, normalized=True)
 
-            height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height-bar_state[0, 1])
+            # height_map = self.get_mean_height_map(part_state, bar_state, bar_rot, part_height)
 
-            ang_vel = self.get_angular_vel(part_state,part_vel) #3
+            part_pos_xyz = np.concatenate([part_state[:,0,np.newaxis],part_height[:,np.newaxis],part_state[:,1,np.newaxis]],axis=1)
+
+            height_map = self.get_mean_height_map(part_pos_xyz, bar_state)
+
+            ang_vel = self.get_angular_vel(part_pos_xyz,part_vel) #3
             bar_pos = bar_state[0]  # 3
             bar_ang_x = np.array([np.cos(bar_state[1, 0]), np.sin(bar_state[1, 0])])  # 2
 
@@ -230,18 +227,22 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
     def get_angular_vel(self,part_pos,part_vel):
         return self.get_angular_vel_flex(part_pos,part_vel)
-    def get_mean_height_map(self, particles, bar_state, rot, heights, normalized=True, width=2.5):
+    
+    
+    def get_mean_height_map(self, particles, bar_state, normalized=True, width=2.5):
 
         if (particles.shape[0] == 0):
             return np.zeros((self.resolution, self.resolution))
-        particles -= bar_state[0, (0, 2)]
 
-        particles = np.matmul(particles, rot.transpose())
+        bar_euler = bar_state[1]
+        bar_rot = R.from_euler('x',bar_euler[0])
 
-        particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
-        # H = self.get_densiaaaaaaty(particles, self.resolution,
-        #                      2.5, self.mapHalfExtent)
-        H = self.get_height_map(particles, heights, self.resolution, width, self.mapHalfExtent)
+        rel_pos = particles-bar_state[0]
+
+        trans_pos = bar_rot.inv().apply(rel_pos)
+        trans_pos[:,(0,2)] = np.clip(trans_pos[:,(0,2)], -self.barDim[1], self.barDim[1])
+
+        H = self.get_height_map(trans_pos[:,(0,2)], trans_pos[:,1], self.resolution, width, self.mapHalfExtent)
         # print(np.max(H))
         # if normalized:
         # H = H ** (1.0 / 2)
@@ -250,6 +251,26 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         # H = np.clip(H, 0, 1)
         return H
+    # def get_mean_height_map(self, particles, bar_state, rot, heights, normalized=True, width=2.5):
+
+    #     if (particles.shape[0] == 0):
+    #         return np.zeros((self.resolution, self.resolution))
+    #     particles -= bar_state[0, (0, 2)]
+
+    #     particles = np.matmul(particles, rot.transpose())
+
+    #     particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
+    #     # H = self.get_densiaaaaaaty(particles, self.resolution,
+    #     #                      2.5, self.mapHalfExtent)
+    #     H = self.get_height_map(particles, heights, self.resolution, width, self.mapHalfExtent)
+    #     # print(np.max(H))
+    #     # if normalized:
+    #     # H = H ** (1.0 / 2)
+    #     # H = H / (10)
+    #     # H = H / (50)
+
+    #     # H = np.clip(H, 0, 1)
+    #     return H
 
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
@@ -304,6 +325,8 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         self.setMapHalfExtent(self.mapHalfExtent)
 
         pos = np.zeros((self.numInstances, 3))
+        # pos[:,0] = 1
+        # pos[:,2] = 1
         # pos[:,2] = -0.4
         # pos[:,1] = np.random.uniform(self.minHeight,2,(self.numInstances))
         # pos[:, 1] = self.good_height  # Set the height at fixed good height
@@ -520,21 +543,21 @@ if __name__ == '__main__':
     env = PlasticFlippingEnv()
 
     env.reset()
-    for i in range(2000):
+    for i in range(20000):
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((1, 4))
         # act[:, 0]=0
 
-        if(i%100<30):
-            act[:, 1] = 1
+        # if(i%100<30):
+        #     act[:, 1] = 1
 
-            # act[:, 3] = 1
+        #     # act[:, 3] = 1
 
-        else:
-            act[:, 1] = -1
-            act[:, 3] = -1
+        # else:
+        #     act[:, 1] = -1
+        #     act[:, 3] = -1
         # act[:, 2] = 0
         # act[:, 3] = -1
         # act[:, 4] = 1
@@ -542,10 +565,10 @@ if __name__ == '__main__':
         # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)
         env.render()
-        if i % 100 == 0:
-            print(i)
-        if i % 100 == 0:
-            env.reset()
+        # if i % 100 == 0:
+        #     print(i)
+        # if i % 100 == 0:
+        #     env.reset()
         if done:
             # env.reset()
             break

@@ -10,7 +10,6 @@ from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from scipy.spatial.distance import cdist
-from scipy.spatial.transform import Rotation as R
 
 try:
     import bindings as pyFlex
@@ -18,7 +17,7 @@ except ImportError as e:
     raise error.DependencyNotInstalled(
         "{}. (HINT: PyFlex Binding is not installed correctly)".format(e))
 
-class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
+class PlasticTestEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
@@ -34,8 +33,8 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        # self.clusterDim = np.array([5,5,5])
-        self.clusterDim = np.array([6,5,6])
+        self.clusterDim = np.array([10,10,10])
+        # self.clusterDim = np.array([6,5,6])
 
         action_bound = np.array([[-8, -8, -8, -np.pi / 2,-np.pi / 2], [
             8, 8, 8, np.pi / 2,np.pi / 2]])
@@ -46,7 +45,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=4, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -67,36 +66,63 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
         self.innerRatio = 0.8
-        self.minHeight =0.3
-        # self.minHeight =0.1
+        # self.minHeight =0.3
+        self.minHeight =0.15
 
         print("With Height Map Attraction. X Y Axis of Rotation")
 
+    def angle_to_rot_matrix(self, angles):
+        rot_vec = np.ones((self.numInstances, 2, 2))
 
+        rot_vec[:, 0, 0] = np.cos(angles)
+        rot_vec[:, 0, 1] = -np.sin(angles)
+        rot_vec[:, 1, 0] = np.sin(angles)
+        rot_vec[:, 1, 1] = np.cos(angles)
+        return rot_vec
 
     def _step(self, action):
         action = action * self.action_scale
         prev_bar_state, prev_part_state, prev_part_heights = self.get_state()
 
+        rot_mat = self.angle_to_rot_matrix(action[:, 3])
+
         transformed_action = np.zeros((self.numInstances, 6))
 
-        target_x_rot = np.zeros(self.numInstances)
         for i in range(action.shape[0]):
+            bar_rot_trans = prev_bar_state[i, 1, 1]
+            bar_rot_vec = np.array([np.cos(bar_rot_trans), np.sin(bar_rot_trans)])
 
-            bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
-            action_trans = bar_rot.apply(action[i, 0:3])
+            bar_rot = np.zeros((2, 2))
+            bar_rot[0, 0] = bar_rot_vec[0]
+            bar_rot[0, 1] = -bar_rot_vec[1]
+            bar_rot[1, 0] = bar_rot_vec[1]
+            bar_rot[1, 1] = bar_rot_vec[0]
 
-            transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
+            targ_pos_trans = np.matmul(
+                bar_rot.transpose(), action[i, (0, 2)])
 
-            transformed_xz_velocity = bar_rot.apply(prev_bar_state[i,2])
+            action[i, (0, 2)] = targ_pos_trans
+
+            transformed_action[i, 0:3] = action[i, 0:3] + prev_bar_state[i, 0]
+            transformed_xz_velocity = bar_rot @ prev_bar_state[i,2,(0,2)]
 
             # Constraining the rotation to be velocity aligned
-            target_x_rot[i] = 0 
-            if (action[i,2])<-0.1:
-                target_x_rot[i] = -np.pi/6
-            elif action[i,2]>0.1:
-                target_x_rot[i] = np.pi/6 
-            
+            # target_x_rot = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/8,0) if transformed_xz_velocity[1]<0 else np.clip(prev_bar_state[i, 1, 0] + action[i, 3],0,np.pi/8)
+            if(np.pi/2>prev_bar_state[i,1,1]>-np.pi/2):
+                target_x_rot = 0 
+                if (action[i,2])<-0.1:
+
+                    target_x_rot = -np.pi/6
+                elif action[i,2]>0.1:
+                    target_x_rot = np.pi/6 
+            else:
+                target_x_rot = 0 
+                if (action[i,2])<-0.1:
+
+                    target_x_rot = np.pi/6
+                elif action[i,2]>0.1:
+                    target_x_rot = -np.pi/6  
+                           
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
         flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
@@ -304,10 +330,10 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
                              width, self.mapHalfExtent)
 
         if normalized:
-            # H = H ** (1.0 / 2)
-            # H = H / (50)
-            H = H / (200)
-            H = np.clip(H, 0, 1)
+            H = H ** (1.0 / 2)
+            H = H / (50)
+            # H = H / (200)
+            # H = np.clip(H, 0, 1)
         return H
 
     def get_mean_height_map(self, particles, bar_state, rot, heights, normalized=True, width=2.5):
@@ -332,7 +358,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # H = H / (50)
 
         # H = np.clip(H, 0, 1)
-        return H
+        return (H+1)**2-1
 
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
@@ -591,7 +617,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
 
 if __name__ == '__main__':
-    env = PlasticSpreadingRotXYHeightEnv()
+    env = PlasticTestEnv()
     env.seed(0)
     env.reset()
     for i in range(2000):
@@ -600,9 +626,9 @@ if __name__ == '__main__':
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((49, 5))
         # act[:, 0]=0
-        # act[:, 1] = 1
+        act[:, 1] = 1
         act[:, 2] = -1
-        # act[:, 3] = -1
+        act[:, 3] = -1
         # act[:, 4] = 1
 
         # act[:, -1] = 1
