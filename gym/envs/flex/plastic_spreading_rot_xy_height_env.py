@@ -42,7 +42,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -106,19 +106,20 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             # Constraining the rotation to be velocity aligned
             # target_x_rot = np.clip(prev_bar_state[i, 1, 0] + action[i, 3],-np.pi/8,0) if transformed_xz_velocity[1]<0 else np.clip(prev_bar_state[i, 1, 0] + action[i, 3],0,np.pi/8)
             if(np.pi/2>prev_bar_state[i,1,1]>-np.pi/2):
-                target_x_rot = 0 
+                target_x_rot = 0
                 if (action[i,2])<-0.1:
 
                     target_x_rot = -np.pi/6
                 elif action[i,2]>0.1:
-                    target_x_rot = np.pi/6 
+                    target_x_rot = np.pi/6
             else:
+                target_x_rot = 0
                 if (action[i,2])<-0.1:
 
                     target_x_rot = np.pi/6
                 elif action[i,2]>0.1:
-                    target_x_rot = -np.pi/6  
-                           
+                    target_x_rot = -np.pi/6
+
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
         flex_action[:, 1] = np.clip(transformed_action[:, 1],self.minHeight,10)
