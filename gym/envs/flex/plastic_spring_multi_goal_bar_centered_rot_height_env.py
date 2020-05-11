@@ -40,8 +40,6 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
         action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
            8, 8,8, np.pi / 2]])
-        # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
-        #     7, 7, np.pi / 2,-1]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
@@ -53,16 +51,16 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 0.5, 0.001])
+        self.barDim = np.array([0.7, 1.0, 0.001])
 
         # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
         # self.center_list = np.array([[2, -2], [-2, 2]])
-        self.center_list = np.random.uniform(-2, 2, (100, 2))
+        # self.center_list = np.random.uniform(-2, 2, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -77,7 +75,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =3
+        self.currCurriculum =0
         print("Plastic Goal Sweeping With Lifting Dof")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -118,18 +116,24 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         prev_distances_center_1 = np.max(prev_distances_center_1_per_part, axis=1)
 
         transformed_action = np.zeros((self.numInstances, 5))
+        target_x_rot = np.zeros(self.numInstances)
         for i in range(action.shape[0]):
             bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
             action_trans = bar_rot.apply(action[i, 0:3])
 
             transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
 
+            target_x_rot[i] = 0 
+            if (action[i,2])<-0.1:
+                target_x_rot[i] = np.pi/6
+            elif action[i,2]>0.1:
+                target_x_rot[i] = -np.pi/6 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = 0#np.clip(transformed_action[:, 1],0,1)
+        flex_action[:, 1] = np.clip(transformed_action[:, 1],0,1)*0
         flex_action[:, 2] = transformed_action[:, 2]
 
-        flex_action[:, 3] = 0
+        flex_action[:, 3] = target_x_rot
         flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 3]
         flex_action[:, 5] = 0
         flex_action[:, 6] = -1
@@ -162,25 +166,23 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             maxidx = np.argmax(curr_distances_center_1_per_part[i])
             dist = dist[maxidx]
 
+            # if(dist<1):
+            #     self.stage[i] = 1
+                
+            #     target_dist_curr[i] = 0.3+10*(prev_distances_center_1[i]-curr_distances_center_1[i]) + part_movement_rwd[i]
+            # else:
+            #     self.stage[i] = 0
+            #     target_dist_curr[i] = -0.1*dist
+
             if(dist<1):
                 self.stage[i] = 1
-                target_dist_curr[i] = 0.3+5*(prev_distances_center_1[i]-curr_distances_center_1[i]) + part_movement_rwd[i]
+                dist_diff = (prev_distances_center_1[i]-curr_distances_center_1[i])
+                if(dist_diff<0):
+                    dist_diff*= 1.5
+                target_dist_curr[i] = 0.3+15*dist_diff + part_movement_rwd[i]
             else:
                 self.stage[i] = 0
                 target_dist_curr[i] = -0.1*dist
-
-        # for i in range(self.numInstances):
-        #     dist = to_bar_dist_curr[i]
-        #     maxidx = np.argmax(curr_distances_center_1_per_part[i])
-        #     dist = dist[maxidx]
-
-        #     if(dist<1):
-        #         self.stage[i] = 1
-        #         target_dist_curr[i] = 0.7*(1-np.clip(np.exp(-0.2*(prev_distances_center_1[i]-curr_distances_center_1[i])),-1,1))+0.3*(1-np.exp(-20*part_movement_rwd[i]))
-        #     else:
-        #         self.stage[i] = 0
-        #         # print(-0.1*np.exp(0.001*(dist-1)))
-        #         target_dist_curr[i] = -0.1*np.exp(0.001*(dist-1))
 
         obs = self._get_obs()
 
@@ -533,9 +535,9 @@ if __name__ == '__main__':
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 4))
+        act = np.zeros((1, 4))
         # act[:, 0] = 1
-        # act[:, 1] = 0
+        act[:, 1] = 0.1
 
         # act[:, 2] = 1
         act[:, -1] = 1
