@@ -166,7 +166,10 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             maxidx = np.argmax(curr_distances_center_1_per_part)
             dist = part2BarDist[maxidx]
 
-            if(dist<1.5):
+            threshold = 4.0/max_dist
+            # if( i==0):
+            #     print("Thresh: ",threshold)
+            if(dist<1):
                 self.stage[i] = 1
                 
                 target_dist_curr[i] = 0.3+20*(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
@@ -175,7 +178,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
                 self.stage[i] = 0
                 target_dist_curr[i] = -0.1*dist
 
-        print(self.stage[0])
+        # print(self.stage[0])
         obs = self._get_obs()
 
         rewards =target_dist_curr
