@@ -335,7 +335,7 @@ if __name__ == '__main__':
             # act = generate_manual_action_abs_rot(W, A, S, D, CW, CCW, 0, skip, obs)
             # print(act)
 
-            act = generate_manual_action_rot_tilt(W, A, S, D,Up,Down, CW, CCW, CW_T,CCW_T, skip, obs)[:,(0,1,2,4)]
+            act = generate_manual_action_rot_tilt(W, A, S, D,Up,Down, CW, CCW, CW_T,CCW_T, skip, obs)#[:,(0,1,2,4)]
             print("Action", act)
             # act = generate_manual_action_abs_rot(W,A,S,D,CW,CCW,Ghost,skip,obs)
             act = act[:]#/env.unwrapped.action_scale
