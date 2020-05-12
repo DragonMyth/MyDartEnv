@@ -35,34 +35,32 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5, 2, 5])
+        self.clusterDim = np.array([10, 10, 10])
         # self.clusterDim = np.array([1, 1, 1])
 
         action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
            8, 8,8, np.pi / 2]])
-        # action_bound = np.array([[-7, -7, -np.pi / 2,-1], [
-        #     7, 7, np.pi / 2,-1]])
+
+        # action_bound = np.array([[-5,-5,-5, -np.pi / 2], [
+        #    5, 5,5, np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=5, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=3)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 0.5, 0.001])
+        self.barDim = np.array([0.7, 1.0, 0.001])
 
         # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
-        # self.center_list = np.array([[2.0,0], [-2.0,0]])
-        # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
-        # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
-        # self.center_list = np.array([[2, -2], [-2, 2]])
-        self.center_list = np.random.uniform(-2, 2, (100, 2))
+        self.center_list = np.array([[1000.0, 0.0], [1000.0, 0.0]])
+
+        # self.center_list = np.random.uniform(-2, 2, (100, 2))
 
         self.randGoalRange = self.center_list.shape[0]
 
@@ -77,7 +75,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =3
+        self.currCurriculum =0
+        self.min_of_max_dist = 9999*np.ones(self.numInstances)
         print("Plastic Goal Sweeping With Lifting Dof")
     def generate_rand_rot_vec(self):
         rand_rot_ang = np.random.uniform(-np.pi, np.pi, self.numInstances)
@@ -108,18 +107,10 @@ class PlasticTestEnv(flex_env.FlexEnv):
         centers = self.center_list[self.circle_center]
         group1_center = centers[:, 0]
 
-        expanded_group1_centers = np.expand_dims(group1_center, axis=1)
-        expanded_group1_centers = np.repeat(
-            expanded_group1_centers, prev_part_state.shape[1], axis=1)
-
-        prev_distances_center_1_per_part = (10+np.linalg.norm(
-            prev_part_state - expanded_group1_centers, axis=2))**2
-
-        prev_distances_center_1 = np.max(prev_distances_center_1_per_part, axis=1)
-
         transformed_action = np.zeros((self.numInstances, 5))
         target_x_rot = np.zeros(self.numInstances)
-        for i in range(action.shape[0]):
+        for i in range(self.numInstances):
+            
             bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
             action_trans = bar_rot.apply(action[i, 0:3])
 
@@ -130,9 +121,10 @@ class PlasticTestEnv(flex_env.FlexEnv):
                 target_x_rot[i] = np.pi/6
             elif action[i,2]>0.1:
                 target_x_rot[i] = -np.pi/6 
+
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
-        flex_action[:, 1] = 0#np.clip(transformed_action[:, 1],0,1)
+        flex_action[:, 1] = 0
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = target_x_rot
@@ -144,50 +136,49 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         curr_bar_state,curr_part_state = self.get_state()
 
-        curr_distances_center_1_per_part = (10+np.linalg.norm(
-            curr_part_state - expanded_group1_centers, axis=2))**2
-
-
-        curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=1)
-
-        expanded_bar_centers = np.expand_dims(curr_bar_state[:, 0,(0,2)], axis=1)
-        expanded_bar_centers = np.repeat(expanded_bar_centers, curr_part_state.shape[1], axis=1)
-
-        to_bar_dist_curr = (np.linalg.norm(curr_part_state - expanded_bar_centers, axis=2))**2
-
-
-        part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
-            (curr_part_state - prev_part_state), axis=2), axis=1)*5
-
-
         target_dist_curr = np.zeros(self.numInstances)
 
-        # The following rwd is a working setting of parameters
+        
         for i in range(self.numInstances):
-            dist = to_bar_dist_curr[i]
-            maxidx = np.argmax(curr_distances_center_1_per_part[i])
-            dist = dist[maxidx]
+            
+            prev_part = prev_part_state[i]
+            curr_part = curr_part_state[i]
+            group_center = group1_center[i]
+
+            prev_distances_center_1_per_part = (10+np.linalg.norm(
+                prev_part - group_center, axis=1))**2
+
+            prev_distances_center_1 = np.max(prev_distances_center_1_per_part, axis=0)
+
+            curr_distances_center_1_per_part = (10+np.linalg.norm(
+                curr_part - group_center, axis=1))**2
+
+            curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=0)
+
+            part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
+                (curr_part - prev_part), axis=1), axis=0)*5
+
+            max_dist = curr_distances_center_1**0.5-10
+            if self.min_of_max_dist[i]>max_dist:
+                self.min_of_max_dist[i] = max_dist
+
+            part2BarDist = (np.linalg.norm(prev_part - curr_bar_state[i, 0,(0,2)], axis=1))**2
+            maxidx = np.argmax(curr_distances_center_1_per_part)
+            dist = part2BarDist[maxidx]
 
             if(dist<1):
                 self.stage[i] = 1
-                target_dist_curr[i] = 0.3+5*(prev_distances_center_1[i]-curr_distances_center_1[i]) + part_movement_rwd[i]
+                
+                target_dist_curr[i] = 0.3+20*(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
+
+                if max_dist < 1.6:
+                    target_dist_curr[i]+=3
+
             else:
                 self.stage[i] = 0
                 target_dist_curr[i] = -0.1*dist
 
-        # for i in range(self.numInstances):
-        #     dist = to_bar_dist_curr[i]
-        #     maxidx = np.argmax(curr_distances_center_1_per_part[i])
-        #     dist = dist[maxidx]
-
-        #     if(dist<1):
-        #         self.stage[i] = 1
-        #         target_dist_curr[i] = 0.7*(1-np.clip(np.exp(-0.2*(prev_distances_center_1[i]-curr_distances_center_1[i])),-1,1))+0.3*(1-np.exp(-20*part_movement_rwd[i]))
-        #     else:
-        #         self.stage[i] = 0
-        #         # print(-0.1*np.exp(0.001*(dist-1)))
-        #         target_dist_curr[i] = -0.1*np.exp(0.001*(dist-1))
-
+        print(np.mean(self.min_of_max_dist))
         obs = self._get_obs()
 
         rewards =target_dist_curr
@@ -296,14 +287,16 @@ class PlasticTestEnv(flex_env.FlexEnv):
         return bar_state,part_state
 
     def _reset(self):
+        
 
-        if(np.mean(self.rolloutRet) > 400):
+        if(np.mean(self.min_of_max_dist) < 1.6):
             self.currCurriculum=min(3,self.currCurriculum+1)
 
         print("Current Curriculum Level: ", self.currCurriculum)
         print("Current Cluster Number Level: ", self.numInitClusters)
         print("Return at current rollout: ", self.rolloutRet)
-        print("Mean Return at current rollout: ", np.mean(self.rolloutRet))
+        print("Mean Haussdorf at current rollout: ", np.mean(self.min_of_max_dist))
+        self.min_of_max_dist = 9999*np.ones(self.numInstances)
 
         # self.randGoalRange = 2+2*min(3,self.currCurriculum)
         self.numInitClusters = 1+self.currCurriculum
@@ -352,11 +345,11 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.set_goal(goals)
         self.setMapHalfExtent(self.mapHalfExtent)
 
-        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))
+        pos = np.random.uniform(-self.mapHalfExtent, self.mapHalfExtent, (self.numInstances, 3))*0.3
         # pos[:,0] = 4
         # pos[:,2] = 4
 
-        pos[:,1] =0*np.random.uniform(0, 1, (self.numInstances))
+        pos[:,1] =0
 
         rot = np.random.uniform(-np.pi, np.pi, (self.numInstances, 3))
         rot[:, 2] = 0  # Do not control the z axis rotation
@@ -541,10 +534,10 @@ if __name__ == '__main__':
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
         act = np.zeros((1, 4))
         # act[:, 0] = 1
-        # act[:, 1] = 0
+        # act[:, 1] = 0.1
 
         # act[:, 2] = 1
-        act[:, -1] = 1
+        # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)
         env.render()
         if i % 100 == 0:
