@@ -38,9 +38,11 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.clusterDim = np.array([5, 2, 5])
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
-           8, 8,8, np.pi / 2]])
+        # action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
+        #    8, 8,8, np.pi / 2]])
 
+        action_bound = np.array([[-8, -8, -np.pi / 2], [
+           8, 8, np.pi / 2]])
         # action_bound = np.array([[-5,-5,-5, -np.pi / 2], [
         #    5, 5,5, np.pi / 2]])
 
@@ -111,8 +113,9 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         target_x_rot = np.zeros(self.numInstances)
         for i in range(self.numInstances):
             
+            act = np.array([action[i, 0],0,action[i, 1]])
             bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
-            action_trans = bar_rot.apply(action[i, 0:3])
+            action_trans = bar_rot.apply(act[0:3])
 
             transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
 
@@ -128,7 +131,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = target_x_rot
-        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 3]
+        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 2]
         flex_action[:, 5] = 0
         flex_action[:, 6] = -1
 
@@ -532,12 +535,12 @@ if __name__ == '__main__':
         # env.render()
         # print(pyFlex.get_state())
         # act = np.random.uniform([-4, -4, -1, -1], [4, 4, 1, 1],(25,4))
-        act = np.zeros((49, 4))
+        act = np.zeros((49, 3))
         # act[:, 0] = 1
-        act[:, 1] = 0.1
+        act[:, 0] = 0.1
 
         # act[:, 2] = 1
-        act[:, -1] = 1
+        # act[:, -1] = 1
         obs, rwd, done, info = env.step(act)
         env.render()
         if i % 100 == 0:

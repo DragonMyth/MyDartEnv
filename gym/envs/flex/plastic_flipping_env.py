@@ -33,14 +33,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([6,2,6])
+        self.clusterDim = np.array([5,2,5])
         action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
             10, 10, 10, np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
