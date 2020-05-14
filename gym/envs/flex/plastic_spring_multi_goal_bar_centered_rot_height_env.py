@@ -38,11 +38,11 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.clusterDim = np.array([5, 2, 5])
         # self.clusterDim = np.array([1, 1, 1])
 
-        action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
-           8, 8,8, np.pi / 2]])
+        # action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
+        #    8, 8,8, np.pi / 2]])
 
-        # action_bound = np.array([[-8, -8, -np.pi / 2], [
-        #    8, 8, np.pi / 2]])
+        action_bound = np.array([[-8, -8, -np.pi / 2], [
+           8, 8, np.pi / 2]])
         # action_bound = np.array([[-5,-5,-5, -np.pi / 2], [
         #    5, 5,5, np.pi / 2]])
 
@@ -77,7 +77,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.rolloutCnt = 0
         self.stage = np.ones(self.numInstances)
         self.rolloutRet = np.zeros(self.numInstances)
-        self.currCurriculum =2
+        self.currCurriculum =3
         self.min_of_max_dist = 9999*np.ones(self.numInstances)
         print("Plastic Goal Sweeping With Lifting Dof")
     def generate_rand_rot_vec(self):
@@ -113,7 +113,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         target_x_rot = np.zeros(self.numInstances)
         for i in range(self.numInstances):
             
-            act = np.array([action[i, 0],0,action[i, 2]])
+            act = np.array([action[i, 0],0,action[i, 1]])
             bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
             action_trans = bar_rot.apply(act[0:3])
 
@@ -131,7 +131,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         flex_action[:, 2] = transformed_action[:, 2]
 
         flex_action[:, 3] = target_x_rot
-        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 3]
+        flex_action[:, 4] = prev_bar_state[:, 1, 1] + action[:, 2]
         flex_action[:, 5] = 0
         flex_action[:, 6] = -1
 
