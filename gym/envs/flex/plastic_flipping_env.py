@@ -129,14 +129,14 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             rel_pos = currParts-curr_bar_state[i,0]
 
             trans_pos = bar_rot.inv().apply(rel_pos)
-            currParts = currParts[trans_pos[:,1]>0.5]
-            curr_part_vel = curr_part_vel[trans_pos[:,1]>0.5]
+            currParts = currParts[trans_pos[:,1]>0.7]
+            curr_part_vel = curr_part_vel[trans_pos[:,1]>0.7]
             ang_vel = self.get_angular_vel(currParts,curr_part_vel)
 
             ang_vels_full[i] = 5*ang_vel
             ang_vel_proj = np.dot(ang_vel,np.array([1,0,0]))
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([1,0,0]))
-            ang_vels[i] = -0.2*(ang_vel_proj)
+            ang_vels[i] = -0.5*(ang_vel_proj)
             ang_vels_res[i] = (ang_vel_res)
 
 
