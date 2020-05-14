@@ -22,7 +22,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
     def __init__(self):
 
         self.resolution = 32
-        self.direct_info_dim = 10
+        self.direct_info_dim = 13
         obs_size = self.resolution * self.resolution *1 + self.direct_info_dim
 
         self.frame_skip = 10
@@ -33,14 +33,14 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([6,2,6])
+        self.clusterDim = np.array([2,2,2])
         action_bound = np.array([[-10, -10, -10, -np.pi / 2], [
             10, 10, 10, np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -60,6 +60,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         self.rolloutRet = np.zeros(self.numInstances)
         self.currCurriculum = 0
         self.rwdBuffer = [[0, 0, 0] for _ in range(100)]
+
 
         print("============================================Flipping================================================")
 
@@ -100,13 +101,13 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         prev_height_diff = np.min(prev_part_heights,axis=1)-prev_bar_state[:,0,1]
         prev_com_xz = np.mean(prev_part_state,axis=1)
-      
+
         # Simulation
         done = self.do_simulation(flex_action, self.frame_skip)
 
         curr_bar_state, curr_part_state, curr_part_heights,curr_part_vels = self.get_state()
-        
-        curr_com_xz = np.mean(curr_part_state,axis=1) 
+
+        curr_com_xz = np.mean(curr_part_state,axis=1)
         obs = self._get_obs()
 
         height_diff = np.min(curr_part_heights,axis=1)-curr_bar_state[:,0,1]
@@ -116,36 +117,45 @@ class PlasticTestEnv(flex_env.FlexEnv):
         curr_total_heat_cnt = np.zeros(self.numInstances)
         ang_vels = np.zeros(self.numInstances)
         ang_vels_full = np.zeros((self.numInstances,3))
+        ang_vels_res = np.zeros(self.numInstances)
         for i in range(self.numInstances):
             height = height_diff[i]
-
+            curr_part_vel = curr_part_vels[i]
             # curr_total_heat_cnt[i] = heat[heat>0.5].shape[0]
             # curr_total_heat[i] = np.sum(heat[height>0.2])
+            bar_rot = R.from_euler('x',curr_bar_state[i,1,0])
 
             currParts = np.concatenate([curr_part_state[i,:,0,np.newaxis],curr_part_heights[i,:,np.newaxis],curr_part_state[i,:,1,np.newaxis]],axis=1)
-            curr_part_vel = curr_part_vels[i]
-            ang_vel = self.get_angular_vel(currParts,curr_part_vel)
-            # print(curr_part_vel)
-            ang_vels_full[i] = 4*ang_vel
-            ang_vel_proj = np.dot(ang_vel,np.array([1,0,0]))
-            ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([0,0,1]))
-            ang_vels[i] = 0.1*ang_vel_proj#-ang_vel_res
 
+            rel_pos = currParts-curr_bar_state[i,0]
+
+            trans_pos = bar_rot.inv().apply(rel_pos)
+            # print(trans_pos.shape)
+            currParts = currParts[trans_pos[:,1]>0.5]
+            curr_part_vel = curr_part_vel[trans_pos[:,1]>0.5]
+            # print(currParts.shape)
+            ang_vel = self.get_angular_vel(currParts,curr_part_vel)
+
+            ang_vels_full[i] = 5*ang_vel
+            ang_vel_proj = np.dot(ang_vel,np.array([1,0,0]))
+            ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([1,0,0]))
+            ang_vels[i] = 0.2*(ang_vel_proj)
+            ang_vels_res[i] = (ang_vel_res)
         self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
-        height_diff[height_diff<0] = np.clip(height_diff[height_diff<0],-0.2,0)
+        height_diff[height_diff<2] = np.clip(height_diff[height_diff<2],-0.5,0)
 
-
-        com_diff = 2*np.linalg.norm(curr_com_xz-prev_com_xz,axis=1)
+        rewards =  0.1*height_diff+ang_vels
         # print(com_diff)
-        rewards =  0.1*height_diff+ang_vels#-com_diff
+        # if self.currCurriculum == 1:
+        #     rewards -=-ang_vels_res
 
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],
             'Height' : 0.1*height_diff[0],
             'ang_vel': ang_vels[0],
-            'com_diff': com_diff[0]
+            # 'com_diff': com_diff[0]
 
 
         }
@@ -196,8 +206,11 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
             bar_vel = bar_state[2]  # 3
             bar_ang_vel_x = np.array([np.cos(bar_state[3, 0]), np.sin(bar_state[3, 0])])  # 2
-
-            bar_info = np.concatenate([bar_pos, bar_ang_x, bar_vel, bar_ang_vel_x])
+            # if(i==0):
+            #     print(part_pos_xyz)
+            #     print(part_vel)
+            #     print(ang_vel)
+            bar_info = np.concatenate([bar_pos, bar_ang_x, bar_vel, bar_ang_vel_x,bar_vel])
             obs = np.concatenate(
                 [bar_info, height_map.flatten()
                  ])
@@ -225,9 +238,11 @@ class PlasticTestEnv(flex_env.FlexEnv):
         return H
 
     def get_angular_vel(self,part_pos,part_vel):
+        if(part_pos.shape[0]==0):
+            return np.array([0,0,0])
         return self.get_angular_vel_flex(part_pos,part_vel)
-    
-    
+
+
     def get_mean_height_map(self, particles, bar_state, normalized=True, width=2.5):
 
         if (particles.shape[0] == 0):
@@ -250,32 +265,12 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         # H = np.clip(H, 0, 1)
         return H
-    # def get_mean_height_map(self, particles, bar_state, rot, heights, normalized=True, width=2.5):
-
-    #     if (particles.shape[0] == 0):
-    #         return np.zeros((self.resolution, self.resolution))
-    #     particles -= bar_state[0, (0, 2)]
-
-    #     particles = np.matmul(particles, rot.transpose())
-
-    #     particles = np.clip(particles, -self.mapHalfExtent, self.mapHalfExtent)
-    #     # H = self.get_densiaaaaaaty(particles, self.resolution,
-    #     #                      2.5, self.mapHalfExtent)
-    #     H = self.get_height_map(particles, heights, self.resolution, width, self.mapHalfExtent)
-    #     # print(np.max(H))
-    #     # if normalized:
-    #     # H = H ** (1.0 / 2)
-    #     # H = H / (10)
-    #     # H = H / (50)
-
-    #     # H = np.clip(H, 0, 1)
-    #     return H
 
     def get_state(self):
         full_state = flex_env.FlexEnv.get_state(self)
-        numPart =  (full_state.shape[1]-4)//2  
+        numPart =  (full_state.shape[1]-4)//2
         part_state = full_state[:, 4:4+numPart, (0, 2)]
-        
+
         part_vel = full_state[:, 4+numPart:4+2*numPart, :]
 
         bar_state = full_state[:, :4, :]
@@ -290,7 +285,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         print("Return at current rollout: ", self.rolloutRet)
         print("Mean Return at current rollout: ", np.mean(self.rolloutRet))
         print("Current Curriculum: ",self.currCurriculum)
-        if(np.mean(self.rolloutRet)>70):
+        if(np.mean(self.rolloutRet)>100):
             self.currCurriculum = 1
 
         self.rolloutRet = np.zeros(self.numInstances)

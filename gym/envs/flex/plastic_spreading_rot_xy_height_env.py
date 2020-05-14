@@ -37,16 +37,16 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # self.clusterDim = np.array([5,5,5])
         self.clusterDim = np.array([6,5,6])
 
-        action_bound = np.array([[-8, -8, -8, -np.pi / 2,-np.pi / 2], [
-            8, 8, 8, np.pi / 2,np.pi / 2]])
+        # action_bound = np.array([[-8, -8, -8, -np.pi / 2,-np.pi / 2], [
+        #     8, 8, 8, np.pi / 2,np.pi / 2]])
 
-        # action_bound = np.array([[-5, -5, -5, -np.pi / 2,-np.pi / 2], [
-        #     5, 5, 5, np.pi / 2,np.pi / 2]])
+        action_bound = np.array([[-5, -5, -5, -np.pi / 2,-np.pi / 2], [
+            5, 5, 5, np.pi / 2,np.pi / 2]])
 
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=0, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
