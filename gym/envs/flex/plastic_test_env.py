@@ -47,7 +47,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=3)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=6, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -110,17 +110,17 @@ class PlasticTestEnv(flex_env.FlexEnv):
         transformed_action = np.zeros((self.numInstances, 5))
         target_x_rot = np.zeros(self.numInstances)
         for i in range(self.numInstances):
-            
+
             bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
             action_trans = bar_rot.apply(action[i, 0:3])
 
             transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
 
-            target_x_rot[i] = 0 
+            target_x_rot[i] = 0
             if (action[i,2])<-0.1:
                 target_x_rot[i] = np.pi/6
             elif action[i,2]>0.1:
-                target_x_rot[i] = -np.pi/6 
+                target_x_rot[i] = -np.pi/6
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
@@ -138,9 +138,9 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         target_dist_curr = np.zeros(self.numInstances)
 
-        
+
         for i in range(self.numInstances):
-            
+
             prev_part = prev_part_state[i]
             curr_part = curr_part_state[i]
             group_center = group1_center[i]
@@ -168,7 +168,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
             if(dist<1):
                 self.stage[i] = 1
-                
+
                 target_dist_curr[i] = 0.3+20*(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
 
                 if max_dist < 1.6:
@@ -287,7 +287,7 @@ class PlasticTestEnv(flex_env.FlexEnv):
         return bar_state,part_state
 
     def _reset(self):
-        
+
 
         if(np.mean(self.min_of_max_dist) < 1.6):
             self.currCurriculum=min(3,self.currCurriculum+1)

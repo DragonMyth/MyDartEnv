@@ -115,7 +115,6 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         transformed_action = np.zeros((self.numInstances, 5))
         target_x_rot = np.zeros(self.numInstances)
         for i in range(self.numInstances):
-
             act = np.array([action[i, 0],0,action[i, 1]])
             bar_rot = R.from_euler('y',prev_bar_state[i,1,1])
             action_trans = bar_rot.apply(act[0:3])
