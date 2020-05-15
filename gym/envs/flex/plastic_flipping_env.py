@@ -40,7 +40,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -131,8 +131,9 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             trans_pos = bar_rot.inv().apply(rel_pos)
             ang_vel = self.get_angular_vel(currParts,curr_part_vel)
 
-            ang_vels_full[i] = 5*ang_vel
             w = 1 if np.mean(trans_pos,axis=0)[1]>0.5 else 0
+            ang_vels_full[i] = 5*ang_vel*w
+
             ang_vel_proj =np.dot(ang_vel,np.array([1,0,0]))*w
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([1,0,0]))
             ang_vels[i] = 0.1*(ang_vel_proj)
@@ -144,7 +145,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         height_diff[height_diff<-2] = -0.5
 
         rewards =  0.1*height_diff+ang_vels
-        # print(com_diff)
+        print(ang_vels[0])
         # if self.currCurriculum == 1:
         #     rewards -=-ang_vels_res
 
@@ -554,7 +555,7 @@ if __name__ == '__main__':
         #     act[:, 1] = -1
         #     act[:, 3] = -1
         # act[:, 2] = 0
-        # act[:, 3] = -1
+        act[:, 3] = -1
         # act[:, 4] = 1
 
         # act[:, -1] = 1
