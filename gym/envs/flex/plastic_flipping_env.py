@@ -131,19 +131,18 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             trans_pos = bar_rot.inv().apply(rel_pos)
             ang_vel = self.get_angular_vel(currParts,curr_part_vel)
 
-            w = 1 if np.mean(trans_pos,axis=0)[1]>0.5 else 0
+            
+            w = 1 if np.mean(rel_pos,axis=0)[1]>0.5 else 0
             ang_vels_full[i] = 5*ang_vel*w
-
             ang_vel_proj =np.dot(ang_vel,np.array([1,0,0]))*w
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([1,0,0]))
-            ang_vels[i] = 0.1*(ang_vel_proj)
+            ang_vels[i] = -2*(ang_vel_proj)
             ang_vels_res[i] = (ang_vel_res)
 
 
         self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         height_diff[height_diff<-2] = -0.5
-
         rewards =  0.1*height_diff+ang_vels
         print(ang_vels[0])
         # if self.currCurriculum == 1:
