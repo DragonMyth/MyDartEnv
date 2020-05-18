@@ -37,8 +37,11 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.randomCluster = True
         self.clusterDim = np.array([5, 2, 5])
 
-        action_bound = np.array([[-8, -8, -np.pi / 2], [
-            8, 8, np.pi / 2]])
+
+        action_bound = np.array([[-7, -7, -np.pi / 2], [
+            7, 7, np.pi / 2]])
+        # action_bound = np.array([[-8, -8, -np.pi / 2], [
+        #     8, 8, np.pi / 2]])
         # action_bound = np.array([[-8, -8,-8, -np.pi / 2], [
         #     8, 8,8, np.pi / 2]])
         obs_high = np.ones(obs_size) * np.inf
@@ -51,11 +54,11 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 1.0, 0.001])
+        self.barDim = np.array([0.7, 0.5, 0.01])
 
-        # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
+        self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
@@ -117,10 +120,10 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
 
             target_x_rot[i] = 0
-            if (action[i,1])<-0.1:
-                target_x_rot[i] = np.pi/6
-            elif action[i,1]>0.1:
-                target_x_rot[i] = -np.pi/6
+            # if (action[i,1])<-0.1:
+            #     target_x_rot[i] = np.pi/6
+            # elif action[i,1]>0.1:
+            #     target_x_rot[i] = -np.pi/6
 
         flex_action = np.zeros((self.numInstances, 7))
         flex_action[:, 0] = transformed_action[:, 0]
@@ -170,22 +173,28 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             threshold = max(4.0/max_dist,1)
             # if( i==0):
             #     print("Thresh: ",threshold)
-            if(dist<threshold):
+            # if(dist<threshold):
+            #     self.stage[i] = 1
+            #     target_dist_curr[i] = 0.03+(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
+            #     distrwd[i] = (prev_distances_center_1-curr_distances_center_1)
+            #     velrwd[i] = part_movement_rwd
+            #     if(max_dist<1):
+            #         target_dist_curr[i]+=1
+
+            # else:
+            #     self.stage[i] = 0
+            #     target_dist_curr[i] = -0.01*dist
+
+            if(dist<1):
                 self.stage[i] = 1
-                target_dist_curr[i] = 0.3+(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
-                distrwd[i] = (prev_distances_center_1-curr_distances_center_1)
-                velrwd[i] = part_movement_rwd
-                if(max_dist<1):
-                    target_dist_curr[i]+=1
+                target_dist_curr[i] = 0.3+20*(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
 
             else:
                 self.stage[i] = 0
                 target_dist_curr[i] = -0.1*dist
-
         obs = self._get_obs()
 
         rewards =target_dist_curr
-        print(self.min_of_max_dist[0])
         self.rolloutRet+=rewards
         info = {
             # 'Total Reward': rewards[0],
@@ -300,10 +309,12 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         thresh = 1.5
         ratio = self.min_of_max_dist[self.min_of_max_dist<thresh].shape[0]*1.0/self.min_of_max_dist.shape[0]
         mean =  np.mean(self.min_of_max_dist)
-        if(ratio>0.8 and mean<thresh):
+        # if(ratio>0.8 and mean<thresh):
+        #     print("Advance!")
+        #     self.currCurriculum=min(3,self.currCurriculum+1)
+        if(np.mean(self.rolloutRet) > 400):
             print("Advance!")
             self.currCurriculum=min(3,self.currCurriculum+1)
-
         print("Current Curriculum Level: ", self.currCurriculum)
         print("Current Cluster Number Level: ", self.numInitClusters)
         print("Return at current rollout: ", self.rolloutRet)
