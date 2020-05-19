@@ -23,7 +23,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
         self.resolution = 32
 
-        self.bar_info = 11
+        self.bar_info = 9
         obs_size = self.resolution * self.resolution * 2 + self.bar_info
 
         self.frame_skip = 10
@@ -49,7 +49,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -171,7 +171,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             maxidx = np.argmax(curr_distances_center_1_per_part)
             dist = part2BarDist[maxidx]
 
-            threshold = 4.0/max_dist
+            threshold = max(4.0/max_dist,1)
             # if( i==0):
             #     print("Thresh: ",threshold)
             if(dist<threshold):
@@ -234,9 +234,9 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
 
 
-            bar_pos = bar_state[0]  # 3
+            bar_pos = bar_state[0,(0,2)]  # 3
             bar_ang = bar_rot_vec  # 2
-            bar_vel = bar_state[2]  # 3
+            bar_vel = bar_state[2,(0,2)]  # 3
             bar_ang_vel = np.array([np.cos(bar_state[3, 1]),np.sin(bar_state[3,1])])  # 2
 
             bar_info = np.concatenate([bar_pos, bar_ang, bar_vel, bar_ang_vel])

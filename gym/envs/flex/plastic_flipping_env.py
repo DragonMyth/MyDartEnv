@@ -40,7 +40,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=2, viewer=0)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -132,17 +132,26 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             ang_vel = self.get_angular_vel(currParts,curr_part_vel)
 
             
+            # w = np.mean(rel_pos,axis=0)[1] if np.mean(rel_pos,axis=0)[1]>0.5 else 0
             w = 1 if np.mean(rel_pos,axis=0)[1]>0.5 else 0
+
+            # if(i==0):
+            #     print(np.mean(rel_pos,axis=0)[1])
+            #     print("Vel mag", np.mean(np.linalg.norm(curr_part_vel,axis=1)))
+
             ang_vels_full[i] = 5*ang_vel*w
             ang_vel_proj =np.dot(ang_vel,np.array([1,0,0]))*w
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([1,0,0]))
-            ang_vels[i] = -2*(ang_vel_proj)
+            ang_vels[i] = -np.clip(4*(ang_vel_proj),-1,1)
+            # ang_vels[i] = -4*(ang_vel_proj)
+
             ang_vels_res[i] = (ang_vel_res)
 
-
+            # Heavy penalty on low particle heights
+            # Clipped ang vel val
+            # Only height reward
         self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
-        height_diff[height_diff<-2] = -0.5
         rewards =  0.1*height_diff+ang_vels
         # print(com_diff)
         # if self.currCurriculum == 1:
