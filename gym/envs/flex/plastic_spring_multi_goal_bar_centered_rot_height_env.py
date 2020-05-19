@@ -36,31 +36,29 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         self.numInitClusters = 1
         self.randomCluster = True
         self.clusterDim = np.array([5, 2, 5])
-        # self.clusterDim = np.array([1, 1, 1])
 
-        #action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
-        #   8, 8,8, np.pi / 2]])
 
-        action_bound = np.array([[-8, -8, -np.pi / 2], [
-            8, 8, np.pi / 2]])
-        # action_bound = np.array([[-5,-5,-5, -np.pi / 2], [
-        #    5, 5,5, np.pi / 2]])
-
+        action_bound = np.array([[-7, -7, -np.pi / 2], [
+            7, 7, np.pi / 2]])
+        # action_bound = np.array([[-8, -8, -np.pi / 2], [
+        #     8, 8, np.pi / 2]])
+        # action_bound = np.array([[-8, -8,-8, -np.pi / 2], [
+        #     8, 8,8, np.pi / 2]])
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=0, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
             'video.frames_per_second': int(np.round(1.0 / self.dt))
         }
         self.action_scale = (action_bound[1] - action_bound[0]) / 2
-        self.barDim = np.array([0.7, 1.0, 0.001])
+        self.barDim = np.array([0.7, 0.5, 0.01])
 
-        # self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
+        self.center_list = np.array([[2.0, 2.0], [-2.0, -2.0],[-2.0, 2.0], [2.0, -2.0],[0, 2.0], [0, -2.0],[-2.0, 0], [2.0, 0]])
 
-        self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
+        # self.center_list = np.array([[0.0, 0.0], [0.0, 0.0]])
         # self.center_list = np.array([[2.0,0], [-2.0,0]])
         # self.center_list = np.array([[0.0, -2.0], [0.0, 2.0]])
         # self.center_list = np.array([[1.5,1.5], [-1.5, -1.5]])
@@ -122,9 +120,9 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             transformed_action[i, 0:3] = action_trans + prev_bar_state[i, 0]
 
             target_x_rot[i] = 0
-            # if (action[i,2])<-0.1:
+            # if (action[i,1])<-0.1:
             #     target_x_rot[i] = np.pi/6
-            # elif action[i,2]>0.1:
+            # elif action[i,1]>0.1:
             #     target_x_rot[i] = -np.pi/6
 
         flex_action = np.zeros((self.numInstances, 7))
@@ -143,7 +141,8 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
         target_dist_curr = np.zeros(self.numInstances)
 
-
+        distrwd = np.zeros(self.numInstances)
+        velrwd = np.zeros(self.numInstances)
         for i in range(self.numInstances):
 
             prev_part = prev_part_state[i]
@@ -160,7 +159,7 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
             curr_distances_center_1 = np.max(curr_distances_center_1_per_part, axis=0)
 
-            part_movement_rwd = 0.3 * np.mean(np.linalg.norm(
+            part_movement_rwd =  np.mean(np.linalg.norm(
                 (curr_part - prev_part), axis=1), axis=0)*5
 
             max_dist = curr_distances_center_1**0.5-10
@@ -174,24 +173,34 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
             threshold = max(4.0/max_dist,1)
             # if( i==0):
             #     print("Thresh: ",threshold)
-            if(dist<threshold):
-                self.stage[i] = 1
+            # if(dist<threshold):
+            #     self.stage[i] = 1
+            #     target_dist_curr[i] = 0.03+(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
+            #     distrwd[i] = (prev_distances_center_1-curr_distances_center_1)
+            #     velrwd[i] = part_movement_rwd
+            #     if(max_dist<1):
+            #         target_dist_curr[i]+=1
 
+            # else:
+            #     self.stage[i] = 0
+            #     target_dist_curr[i] = -0.01*dist
+
+            if(dist<1):
+                self.stage[i] = 1
                 target_dist_curr[i] = 0.3+20*(prev_distances_center_1-curr_distances_center_1) + part_movement_rwd
 
             else:
                 self.stage[i] = 0
                 target_dist_curr[i] = -0.1*dist
-
-        #print(np.mean(self.min_of_max_dist))
-
         obs = self._get_obs()
 
         rewards =target_dist_curr
-
         self.rolloutRet+=rewards
         info = {
-            'Total Reward': rewards[0],
+            # 'Total Reward': rewards[0],
+            'Dist' : distrwd[0],
+            'Vel' : velrwd[0]
+
 
         }
 
@@ -235,8 +244,12 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
 
 
             bar_pos = bar_state[0,(0,2)]  # 3
+            # bar_pos = bar_state[0]  # 3
+
             bar_ang = bar_rot_vec  # 2
+            # bar_vel = bar_state[2]  # 3
             bar_vel = bar_state[2,(0,2)]  # 3
+
             bar_ang_vel = np.array([np.cos(bar_state[3, 1]),np.sin(bar_state[3,1])])  # 2
 
             bar_info = np.concatenate([bar_pos, bar_ang, bar_vel, bar_ang_vel])
@@ -293,11 +306,15 @@ class PlasticSpringMultiGoalBarCenteredRotHeightEnv(flex_env.FlexEnv):
         return bar_state,part_state
 
     def _reset(self):
-
-
-        if(np.mean(self.min_of_max_dist) < 1.1):
+        thresh = 1.5
+        ratio = self.min_of_max_dist[self.min_of_max_dist<thresh].shape[0]*1.0/self.min_of_max_dist.shape[0]
+        mean =  np.mean(self.min_of_max_dist)
+        # if(ratio>0.8 and mean<thresh):
+        #     print("Advance!")
+        #     self.currCurriculum=min(3,self.currCurriculum+1)
+        if(np.mean(self.rolloutRet) > 400):
+            print("Advance!")
             self.currCurriculum=min(3,self.currCurriculum+1)
-
         print("Current Curriculum Level: ", self.currCurriculum)
         print("Current Cluster Number Level: ", self.numInitClusters)
         print("Return at current rollout: ", self.rolloutRet)

@@ -153,7 +153,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         self.set_aux_info(ang_vels_full)
         height_diff[height_diff>0] = 0.1+height_diff[height_diff>0]*10
         rewards =  0.1*height_diff+ang_vels
-        # print(com_diff)
+        print(ang_vels[0])
         # if self.currCurriculum == 1:
         #     rewards -=-ang_vels_res
 

@@ -601,8 +601,9 @@ register(
 register(
     id='FlexPlasticReshaping-v0',
     entry_point='gym.envs.flex:PlasticTestEnv',
-    max_episode_steps=200,
+    max_episode_steps=500,
 )
+
 
 register(
     id='FlexPlasticReshaping-v1',

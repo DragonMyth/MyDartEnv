@@ -154,9 +154,11 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             height = self.get_mean_height_map(filtered_parts, np.array([[0, 0, 0]]), np.identity(2),
                                               filtered_heights,width=1.5)
 
-            outliers = part_state[
-                (part_state[:, 0] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 0] > self.innerRatio*self.mapHalfExtent) | (
-                        part_state[:, 1] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 1] > self.innerRatio*self.mapHalfExtent)]
+            # outliers = part_state[
+            #     (part_state[:, 0] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 0] > self.innerRatio*self.mapHalfExtent) | (
+            #             part_state[:, 1] < -self.innerRatio*self.mapHalfExtent) | (part_state[:, 1] > self.innerRatio*self.mapHalfExtent)]
+
+            outliers = np.linalg.norm(part_state,axis=1)
             curr_untransformed_height[i] = height.flatten()
 
             part_movement = np.linalg.norm(part_state_p-part_state,axis=1)
@@ -164,9 +166,11 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             part_movement_rwd[i] = np.mean(part_movement,axis=0)
 
             if(outliers.shape[0]>0):
-                curr_outlier_dist[i] = np.sum(np.linalg.norm(np.abs(outliers)-self.innerRatio*self.mapHalfExtent,axis=1))
-        # curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
+                curr_outlier_dist[i] = np.sum(np.clip(outliers-self.innerRatio*self.mapHalfExtent,0,outliers-self.innerRatio*self.mapHalfExtent))
 
+                # curr_outlier_dist[i] = np.sum(np.linalg.norm(np.abs(outliers)-self.innerRatio*self.mapHalfExtent,axis=1))
+        # curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
+        # print(curr_outlier_dist[0])
         curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
 
 
