@@ -45,7 +45,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         obs_high = np.ones(obs_size) * np.inf
         obs_low = -obs_high
         observation_bound = np.array([obs_low, obs_high])
-        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=0)
+        flex_env.FlexEnv.__init__(self, self.frame_skip, obs_size, observation_bound, action_bound, scene=1, viewer=1)
 
         self.metadata = {
             'render.modes': ['human', 'rgb_array'],
@@ -166,7 +166,7 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
             part_movement_rwd[i] = np.mean(part_movement,axis=0)
 
             if(outliers.shape[0]>0):
-                curr_outlier_dist[i] = np.sum(np.clip(outliers-self.innerRatio*self.mapHalfExtent,0,outliers-self.innerRatio*self.mapHalfExtent))
+                curr_outlier_dist[i] = np.sum(np.clip(outliers-self.innerRatio*self.mapHalfExtent,0,abs(outliers-self.innerRatio*self.mapHalfExtent)))
 
                 # curr_outlier_dist[i] = np.sum(np.linalg.norm(np.abs(outliers)-self.innerRatio*self.mapHalfExtent,axis=1))
         # curr_height_cnt = np.sum((curr_untransformed_height>0).astype(int),axis=1)
@@ -180,20 +180,6 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
 
         heighest_height = np.take_along_axis(curr_part_heights,heighest_part_idx[:,np.newaxis],axis=1)
         heighest_height = np.squeeze(heighest_height,axis=1)
-        # heighest_part_pos = np.concatenate(heighest_part_pos[:,0],heighest_height[:,0],heighest_part_pos[:,1])
-        # maxI = (maxFlatIdx / self.resolution).astype(int)
-        # maxJ = maxFlatIdx - self.resolution * maxI
-
-        # posX = np.expand_dims((maxJ + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
-        # posY = np.expand_dims((maxI + 0.5) / self.resolution * self.mapHalfExtent * 2 - self.mapHalfExtent, axis=1)
-
-        # densePos = np.concatenate([posX, posY], axis=1)
-        # # transformed_densePos = np.matmul()
-        # to_bar_dist_curr = (np.linalg.norm(heighest_part_pos - curr_bar_state[:, 0, (0, 2)], axis=1)) ** 2
-        # to_bar_height_dist_curr = curr_bar_state[:, 0, 1]-heighest_height
-
-        # part_movement_rwd = np.mean(np.linalg.norm(
-        #     (curr_part_state - prev_part_state), axis=2), axis=1)
 
 
         curr_height_sum = (np.mean(curr_part_heights, axis=1))
@@ -201,25 +187,12 @@ class PlasticSpreadingRotXYHeightEnv(flex_env.FlexEnv):
         # print(1-np.exp(-40*part_movement_rwd))
         target_dist_curr = np.zeros(self.numInstances)
 
-        # print(curr_pair_wise_dist[0]-prev_pair_wise_dist[0])
-        # for i in range(self.numInstances):
-        #     dist= to_bar_dist_curr[i]
-        #     height_dist = to_bar_height_dist_curr[i]
-
-        #     if(dist<=1 and -0.5<height_dist):
-        #         self.stage[i]  =  0
-        #         target_dist_curr[i] = 0.1*(curr_height_cnt[i]-prev_height_cnt[i])+10*(prev_height_sum[i]-curr_height_sum[i])
-        #     else:
-        #         self.stage[i]  =  1
-        #         target_dist_curr[i] = -0.1*dist+0.03*height_dist
-        # print(1 - curr_height_sum)
-        # height_min_rwd = 0.1*(curr_height_cnt-prev_height_cnt)+10*(prev_height_sum-curr_height_sum)
         height_min_rwd = 50*(prev_height_sum - curr_height_sum)
 
         bar_vert_rwd = abs(prev_bar_state[:,0,1]-curr_bar_state[:,0,1])
         # rewards = 1 * height_min_rwd + 0 * part_movement_rwd
-        rewards = 0.1*bar_vert_rwd+0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.001*curr_outlier_dist #+ height_min_rwd
-        # print(0.001*curr_outlier_dist)
+        rewards = 0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.001*curr_outlier_dist #+ height_min_rwd
+        # rewards = 0.1*part_movement_rwd+0.1*(curr_height_cnt-prev_height_cnt)+ height_min_rwd- 0.001*curr_outlier_dist #+ height_min_rwd
         self.rolloutRet += rewards
         info = {
             'Total Reward': rewards[0],

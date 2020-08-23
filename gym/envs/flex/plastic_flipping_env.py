@@ -142,7 +142,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             ang_vels_full[i] = 5*ang_vel*w
             ang_vel_proj =np.dot(ang_vel,np.array([1,0,0]))*w
             ang_vel_res = np.linalg.norm(ang_vel - ang_vel_proj*np.array([1,0,0]))
-            ang_vels[i] = -np.clip(4*(ang_vel_proj),-1,1)
+            ang_vels[i] = np.clip(4*(ang_vel_proj),-1,1)
             # ang_vels[i] = -4*(ang_vel_proj)
 
             ang_vels_res[i] = (ang_vel_res)
@@ -156,7 +156,7 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
 
         height_diff[height_diff<0] *= 0.1
 
-        rewards =  0.1*height_diff+ang_vels
+        rewards =  0.1*0*height_diff+ang_vels
         # print(ang_vels[0])
         # if self.currCurriculum == 1:
         #     rewards -=-ang_vels_res
@@ -212,7 +212,8 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
             part_pos_xyz = np.concatenate([part_state[:,0,np.newaxis],part_height[:,np.newaxis],part_state[:,1,np.newaxis]],axis=1)
 
             height_map = self.get_mean_height_map(part_pos_xyz, bar_state)
-
+            # if(i==0):
+            #     print(np.max(heightz))
             ang_vel = self.get_angular_vel(part_pos_xyz,part_vel) #3
             bar_pos = bar_state[0]  # 3
             bar_ang_x = np.array([np.cos(bar_state[1, 0]), np.sin(bar_state[1, 0])])  # 2
@@ -271,13 +272,15 @@ class PlasticFlippingEnv(flex_env.FlexEnv):
         # trans_pos[:,(0,2)] = np.clip(trans_pos[:,(0,2)], -self.barDim[1], self.barDim[1])
 
         H = self.get_height_map(trans_pos[:,(0,2)], trans_pos[:,1], self.resolution, width, self.mapHalfExtent)
-        # print(np.max(H))
-        # if normalized:
-        # H = H ** (1.0 / 2)
-        # H = H / (10)
-        # H = H / (50)
 
-        # H = np.clip(H, 0, 1)
+
+        # rel_pos = particles-np.array([bar_state[0,0],0,bar_state[0,2]])
+
+        # trans_pos = bar_rot.inv().apply(rel_pos)
+        # trans_pos = trans_pos[(trans_pos[:,0]>-self.barDim[1])&(trans_pos[:,0]<self.barDim[1])&(trans_pos[:,2]>-self.barDim[1])&(trans_pos[:,2]<self.barDim[1])&(trans_pos[:,1]>0)]
+        # trans_pos[:,(0,2)] = np.clip(trans_pos[:,(0,2)], -self.barDim[1], self.barDim[1])
+
+        # H = self.get_height_map(rel_pos[:,(0,2)], rel_pos[:,1], self.resolution, width, self.mapHalfExtent)
         return H
 
     def get_state(self):

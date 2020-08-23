@@ -35,8 +35,8 @@ class PlasticTestEnv(flex_env.FlexEnv):
 
         self.numInitClusters = 1
         self.randomCluster = True
-        self.clusterDim = np.array([5, 2, 5])
-        # self.clusterDim = np.array([1, 1, 1])
+        # self.clusterDim = np.array([5, 2, 5])
+        self.clusterDim = np.array([1, 1, 1])
 
         #action_bound = np.array([[-8,-8, -8, -np.pi / 2], [
         #   8, 8,8, np.pi / 2]])
